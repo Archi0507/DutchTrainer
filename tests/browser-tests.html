@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DutchTrainer Browser Tests</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f4ef;
+        color: #18211f;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      #results {
+        display: grid;
+        gap: 8px;
+        margin: 16px 0;
+      }
+
+      .result {
+        border: 1px solid #dbe2df;
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px;
+      }
+
+      .pass {
+        border-color: #15803d;
+      }
+
+      .fail {
+        border-color: #b45309;
+      }
+
+      iframe {
+        width: 390px;
+        max-width: 100%;
+        height: 760px;
+        border: 1px solid #dbe2df;
+        border-radius: 8px;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DutchTrainer Browser Tests</h1>
+    <button id="runAgain" type="button">Run tests again</button>
+    <div id="results"></div>
+    <iframe id="appFrame" title="DutchTrainer test app"></iframe>
+    <script src="browser-tests.js"></script>
+  </body>
+</html>

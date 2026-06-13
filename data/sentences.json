@@ -1,0 +1,61 @@
+[
+  { "id": "sentence-001", "dutch": "Hallo, hoe gaat het?", "english": "Hello, how are you?", "topic": "Greetings" },
+  { "id": "sentence-002", "dutch": "Het gaat goed.", "english": "It is going well.", "topic": "Greetings" },
+  { "id": "sentence-003", "dutch": "Dank je wel.", "english": "Thank you very much.", "topic": "Greetings" },
+  { "id": "sentence-004", "dutch": "Tot morgen.", "english": "See you tomorrow.", "topic": "Greetings" },
+  { "id": "sentence-005", "dutch": "Mijn naam is Emma.", "english": "My name is Emma.", "topic": "Greetings" },
+
+  { "id": "sentence-006", "dutch": "Ik ben een student.", "english": "I am a student.", "topic": "People" },
+  { "id": "sentence-007", "dutch": "Jij bent mijn vriend.", "english": "You are my friend.", "topic": "People" },
+  { "id": "sentence-008", "dutch": "Hij woont in Amsterdam.", "english": "He lives in Amsterdam.", "topic": "People" },
+  { "id": "sentence-009", "dutch": "Zij spreekt Engels.", "english": "She speaks English.", "topic": "People" },
+  { "id": "sentence-010", "dutch": "Wij zijn een familie.", "english": "We are a family.", "topic": "People" },
+
+  { "id": "sentence-011", "dutch": "Ik heb twee boeken.", "english": "I have two books.", "topic": "Numbers" },
+  { "id": "sentence-012", "dutch": "Er zijn drie stoelen.", "english": "There are three chairs.", "topic": "Numbers" },
+  { "id": "sentence-013", "dutch": "De koffie kost vier euro.", "english": "The coffee costs four euros.", "topic": "Numbers" },
+  { "id": "sentence-014", "dutch": "Het is vijf uur.", "english": "It is five o'clock.", "topic": "Numbers" },
+  { "id": "sentence-015", "dutch": "Ik leer tien woorden.", "english": "I learn ten words.", "topic": "Numbers" },
+
+  { "id": "sentence-016", "dutch": "Mijn huis is klein.", "english": "My house is small.", "topic": "Home" },
+  { "id": "sentence-017", "dutch": "De deur is open.", "english": "The door is open.", "topic": "Home" },
+  { "id": "sentence-018", "dutch": "De sleutel ligt op tafel.", "english": "The key is on the table.", "topic": "Home" },
+  { "id": "sentence-019", "dutch": "Ik slaap in het bed.", "english": "I sleep in the bed.", "topic": "Home" },
+  { "id": "sentence-020", "dutch": "De keuken is schoon.", "english": "The kitchen is clean.", "topic": "Home" },
+
+  { "id": "sentence-021", "dutch": "Ik drink water.", "english": "I drink water.", "topic": "Food" },
+  { "id": "sentence-022", "dutch": "Zij eet brood met kaas.", "english": "She eats bread with cheese.", "topic": "Food" },
+  { "id": "sentence-023", "dutch": "De soep is warm.", "english": "The soup is warm.", "topic": "Food" },
+  { "id": "sentence-024", "dutch": "Mag ik koffie?", "english": "May I have coffee?", "topic": "Food" },
+  { "id": "sentence-025", "dutch": "De appel is lekker.", "english": "The apple is tasty.", "topic": "Food" },
+
+  { "id": "sentence-026", "dutch": "De fiets is blauw.", "english": "The bike is blue.", "topic": "Colors" },
+  { "id": "sentence-027", "dutch": "Mijn tas is zwart.", "english": "My bag is black.", "topic": "Colors" },
+  { "id": "sentence-028", "dutch": "De bloem is geel.", "english": "The flower is yellow.", "topic": "Colors" },
+  { "id": "sentence-029", "dutch": "Het huis is wit.", "english": "The house is white.", "topic": "Colors" },
+  { "id": "sentence-030", "dutch": "De stoel is bruin.", "english": "The chair is brown.", "topic": "Colors" },
+
+  { "id": "sentence-031", "dutch": "Wij gaan naar school.", "english": "We go to school.", "topic": "Actions" },
+  { "id": "sentence-032", "dutch": "Ik lees een boek.", "english": "I read a book.", "topic": "Actions" },
+  { "id": "sentence-033", "dutch": "Hij schrijft zijn naam.", "english": "He writes his name.", "topic": "Actions" },
+  { "id": "sentence-034", "dutch": "Luister naar de zin.", "english": "Listen to the sentence.", "topic": "Actions" },
+  { "id": "sentence-035", "dutch": "Het kind slaapt.", "english": "The child sleeps.", "topic": "Actions" },
+
+  { "id": "sentence-036", "dutch": "Vandaag is het koud.", "english": "Today it is cold.", "topic": "Time" },
+  { "id": "sentence-037", "dutch": "Morgen kom ik terug.", "english": "Tomorrow I come back.", "topic": "Time" },
+  { "id": "sentence-038", "dutch": "Gisteren was ik thuis.", "english": "Yesterday I was home.", "topic": "Time" },
+  { "id": "sentence-039", "dutch": "Ik werk deze week.", "english": "I work this week.", "topic": "Time" },
+  { "id": "sentence-040", "dutch": "Tot later vandaag.", "english": "See you later today.", "topic": "Time" },
+
+  { "id": "sentence-041", "dutch": "De trein is laat.", "english": "The train is late.", "topic": "City" },
+  { "id": "sentence-042", "dutch": "Ik ga met de bus.", "english": "I go by bus.", "topic": "City" },
+  { "id": "sentence-043", "dutch": "De winkel is open.", "english": "The shop is open.", "topic": "City" },
+  { "id": "sentence-044", "dutch": "Wij lopen in het park.", "english": "We walk in the park.", "topic": "City" },
+  { "id": "sentence-045", "dutch": "Het station is dichtbij.", "english": "The station is nearby.", "topic": "City" },
+
+  { "id": "sentence-046", "dutch": "De les is makkelijk.", "english": "The lesson is easy.", "topic": "Adjectives" },
+  { "id": "sentence-047", "dutch": "Dit woord is moeilijk.", "english": "This word is difficult.", "topic": "Adjectives" },
+  { "id": "sentence-048", "dutch": "Mijn jas is nieuw.", "english": "My coat is new.", "topic": "Adjectives" },
+  { "id": "sentence-049", "dutch": "Het water is koud.", "english": "The water is cold.", "topic": "Adjectives" },
+  { "id": "sentence-050", "dutch": "Het eten is goed.", "english": "The food is good.", "topic": "Adjectives" }
+]
