@@ -13,6 +13,10 @@ const DATA_ROOT = CONTENT_MODE === "preview" ? "data-preview" : "data";
 const PROGRESS_KEY = CONTENT_MODE === "preview" ? "dutchTrainerProgressPreview" : "dutchTrainerProgress";
 const VERSION_LABEL = "🇳🇱 v2.0";
 const LEVEL_SEQUENCE = ["A0", "A1.1", "A1.2", "A2.1", "A2.2", "B1.1", "B1.2"];
+const SHOW_HOME_VOCABULARY_SECTION = false;
+const SPEECH_RATE = 0.9;
+const SPEECH_PITCH = 1;
+const SPEECH_VOLUME = 1;
 
 const state = {
   words: [],
@@ -41,6 +45,10 @@ const els = {
   contentModeBadge: document.querySelector("#contentModeBadge"),
   pathCount: document.querySelector("#pathCount"),
   lessonPath: document.querySelector("#lessonPath"),
+  cefrCurrent: document.querySelector("#cefrCurrent"),
+  cefrProgress: document.querySelector("#cefrProgress"),
+  reviewSummaryMeta: document.querySelector("#reviewSummaryMeta"),
+  reviewSummary: document.querySelector("#reviewSummary"),
   vocabCount: document.querySelector("#vocabCount"),
   vocabPractice: document.querySelector("#vocabPractice"),
   practiceTitle: document.querySelector("#practiceTitle"),
@@ -56,14 +64,30 @@ let audioUnlocking = false;
 let speechUnlocked = false;
 let dutchVoice = null;
 let voicesReady = false;
+let dutchVoices = [];
+let dutchVoiceFemalePreferred = false;
 const speechDiagnostics = {
   available: "speechSynthesis" in window,
   lastAttempt: "none",
   lastError: "none"
 };
 const feedbackDiagnostics = {
+  audioEnabled: !state.progress.soundMuted,
+  lastType: "none",
   lastAttempt: "none",
-  lastError: "none"
+  lastSoundAt: "never",
+  lastSoundStatus: "none",
+  lastError: "none",
+  lastHapticAt: "never",
+  lastHapticStatus: "none",
+  lastAnswerCheckResult: "none",
+  lastAnswerCheckTriggeredFeedback: false,
+  correctSoundCalls: 0,
+  wrongSoundCalls: 0,
+  completionSoundCalls: 0,
+  correctHapticCalls: 0,
+  wrongHapticCalls: 0,
+  completionHapticCalls: 0
 };
 let devPanel;
 
@@ -126,11 +150,19 @@ function bindEvents() {
       startLesson({ vocabularyOnly: true });
       render();
     },
+    startReviewPractice: () => {
+      startLesson({ mistakesOnly: false });
+      render();
+    },
+    startWeakPractice: () => {
+      startLesson({ mistakesOnly: true });
+      render();
+    },
     speakDutch: (text) => pronounceDutch(text, { source: "tap" }),
     continueLesson,
-    checkTyped: () => {
+    checkTyped: async () => {
       const input = document.querySelector("#answerInput");
-      answerTask(currentTask(), input?.value || "");
+      await answerTask(currentTask(), input?.value || "");
     }
   };
 
@@ -215,6 +247,8 @@ function render() {
   renderSoundButton();
   renderTopics();
   renderLessonPath();
+  renderCefrProgress();
+  renderReviewSummary();
   renderVocabularyPractice();
   renderLesson();
   renderDeveloperPanel();
@@ -256,7 +290,7 @@ function renderSoundButton() {
 
 function renderTopics() {
   const allTopics = topics();
-  els.topicCount.textContent = `${allTopics.length} topics`;
+  els.topicCount.textContent = `${allTopics.length} practice areas`;
   els.topicList.innerHTML = allTopics.map((topic) => {
     const total = allItemsForTopic(topic).length;
     const learned = learnedCount(topic);
@@ -310,8 +344,58 @@ function renderLessonPath() {
   `).join("");
 }
 
+function renderCefrProgress() {
+  if (!els.cefrProgress) return;
+  const progress = cefrProgressRows();
+  const current = progress.find((row) => row.status === "current")
+    || progress.find((row) => row.status === "done")
+    || progress[0];
+  els.cefrCurrent.textContent = current ? current.id : "A0";
+  els.cefrProgress.innerHTML = progress.map((row) => `
+    <article class="cefr-step ${row.status}">
+      <span>${escapeHtml(row.id)}</span>
+      <strong>${row.status === "done" ? "✓" : row.status === "locked" ? "Locked" : `${row.percent}%`}</strong>
+      <div class="progress-track" aria-hidden="true">
+        <span class="progress-fill" style="width: ${row.status === "done" ? 100 : row.percent}%"></span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderReviewSummary() {
+  if (!els.reviewSummary) return;
+  const due = reviewItems();
+  const weak = weakerWords();
+  const dueSentences = due.filter((item) => item.kind === "sentence").length;
+  els.reviewSummaryMeta.textContent = weak.length ? `${weak.length} weak` : "Caught up";
+  els.reviewSummary.innerHTML = `
+    <div class="review-compact-grid">
+      <article>
+        <strong>${due.length}</strong>
+        <span>due now</span>
+      </article>
+      <article>
+        <strong>${weak.length}</strong>
+        <span>weaker words</span>
+      </article>
+      <article>
+        <strong>${dueSentences}</strong>
+        <span>sentence reviews</span>
+      </article>
+    </div>
+    <div class="review-actions single">
+      <button class="secondary-button" type="button" ${weak.length ? "" : "disabled"} onclick="window.dutchTrainerActions.startWeakPractice()">
+        ${weak.length ? "Review weaker words" : "No weak words yet"}
+      </button>
+    </div>
+  `;
+}
+
 function renderVocabularyPractice() {
   if (!els.vocabPractice) return;
+  const section = els.vocabPractice.closest(".vocab-panel");
+  if (section) section.hidden = !SHOW_HOME_VOCABULARY_SECTION;
+  if (!SHOW_HOME_VOCABULARY_SECTION) return;
   const dueWords = state.words.filter((word) => isDue(word.id)).length;
   const duomeWords = state.words.filter((word) => (word.sourceName || "").toLowerCase().includes("duome")).length;
   const previewWords = state.words.slice(0, 12);
@@ -391,6 +475,10 @@ function renderDeveloperPanel() {
       <button type="button" data-dev-action="test-completion-sound">Test Completion Sound</button>
       <button type="button" data-dev-action="test-haptic-correct">Test Haptic Correct</button>
       <button type="button" data-dev-action="test-haptic-wrong">Test Haptic Wrong</button>
+      <button type="button" data-dev-action="test-haptic-completion">Test Haptic Completion</button>
+      <button type="button" data-dev-action="simulate-correct-feedback">Simulate Correct Answer Feedback</button>
+      <button type="button" data-dev-action="simulate-wrong-feedback">Simulate Wrong Answer Feedback</button>
+      <button type="button" data-dev-action="simulate-completion-feedback">Simulate Completion Feedback</button>
       <button type="button" data-dev-action="test-word">Test Dutch Word</button>
       <button type="button" data-dev-action="test-sentence">Test Dutch Sentence</button>
     </div>
@@ -399,6 +487,11 @@ function renderDeveloperPanel() {
       <dl>
         <div><dt>Speech synthesis available</dt><dd>${speechDiagnostics.available ? "yes" : "no"}</dd></div>
         <div><dt>Selected Dutch voice</dt><dd>${escapeHtml(selectedVoiceLabel())}</dd></div>
+        <div><dt>Selected voice name</dt><dd>${escapeHtml(dutchVoice?.name || "none")}</dd></div>
+        <div><dt>Selected voice language</dt><dd>${escapeHtml(dutchVoice?.lang || "none")}</dd></div>
+        <div><dt>Speech rate</dt><dd>${SPEECH_RATE}</dd></div>
+        <div><dt>Female-preferred match</dt><dd>${dutchVoiceFemalePreferred ? "yes" : "no"}</dd></div>
+        <div><dt>Available Dutch voices</dt><dd>${escapeHtml(availableDutchVoiceLabel())}</dd></div>
         <div><dt>Audio enabled</dt><dd>${state.progress.soundMuted ? "no" : "yes"}</dd></div>
         <div><dt>Pronunciation enabled</dt><dd>${state.progress.soundMuted ? "no" : "yes"}</dd></div>
         <div><dt>AudioContext available</dt><dd>${audioContextAvailable() ? "yes" : "no"}</dd></div>
@@ -411,6 +504,30 @@ function renderDeveloperPanel() {
         <div><dt>Last feedback sound attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastAttempt)}</dd></div>
         <div><dt>Last feedback sound error</dt><dd>${escapeHtml(feedbackDiagnostics.lastError)}</dd></div>
         <div><dt>Haptics supported</dt><dd>${hapticsSupported() ? "yes" : "no"}</dd></div>
+      </dl>
+    </div>
+    <div class="audio-diagnostics">
+      <h3>Feedback Diagnostics</h3>
+      <dl>
+        <div><dt>Audio enabled</dt><dd>${state.progress.soundMuted ? "no" : "yes"}</dd></div>
+        <div><dt>AudioContext available</dt><dd>${audioContextAvailable() ? "yes" : "no"}</dd></div>
+        <div><dt>AudioContext state</dt><dd>${escapeHtml(audioContextStateLabel())}</dd></div>
+        <div><dt>Audio unlocked</dt><dd>${audioUnlocked ? "yes" : "no"}</dd></div>
+        <div><dt>Haptics supported</dt><dd>${hapticsSupported() ? "yes" : "no"}</dd></div>
+        <div><dt>Last feedback type attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastType)}</dd></div>
+        <div><dt>Last feedback sound attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastSoundAt)}</dd></div>
+        <div><dt>Last feedback sound success/failure</dt><dd>${escapeHtml(feedbackDiagnostics.lastSoundStatus)}</dd></div>
+        <div><dt>Last feedback sound error</dt><dd>${escapeHtml(feedbackDiagnostics.lastError)}</dd></div>
+        <div><dt>Last haptic attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastHapticAt)}</dd></div>
+        <div><dt>Last haptic success/failure/unsupported</dt><dd>${escapeHtml(feedbackDiagnostics.lastHapticStatus)}</dd></div>
+        <div><dt>Last answer-check result</dt><dd>${escapeHtml(feedbackDiagnostics.lastAnswerCheckResult)}</dd></div>
+        <div><dt>Last answer-check triggered feedback</dt><dd>${feedbackDiagnostics.lastAnswerCheckTriggeredFeedback ? "yes" : "no"}</dd></div>
+        <div><dt>Correct sound calls</dt><dd>${feedbackDiagnostics.correctSoundCalls}</dd></div>
+        <div><dt>Wrong sound calls</dt><dd>${feedbackDiagnostics.wrongSoundCalls}</dd></div>
+        <div><dt>Completion sound calls</dt><dd>${feedbackDiagnostics.completionSoundCalls}</dd></div>
+        <div><dt>Correct haptic calls</dt><dd>${feedbackDiagnostics.correctHapticCalls}</dd></div>
+        <div><dt>Wrong haptic calls</dt><dd>${feedbackDiagnostics.wrongHapticCalls}</dd></div>
+        <div><dt>Completion haptic calls</dt><dd>${feedbackDiagnostics.completionHapticCalls}</dd></div>
       </dl>
     </div>
     <div class="srs-debug">
@@ -458,8 +575,12 @@ function renderDeveloperPanel() {
       if (action === "test-correct-sound") playCorrectSound();
       if (action === "test-wrong-sound") playWrongSound();
       if (action === "test-completion-sound") playCompletionSound();
-      if (action === "test-haptic-correct") vibrateFeedback("correct");
-      if (action === "test-haptic-wrong") vibrateFeedback("wrong");
+      if (action === "test-haptic-correct") triggerCorrectHaptic();
+      if (action === "test-haptic-wrong") triggerWrongHaptic();
+      if (action === "test-haptic-completion") triggerCompletionHaptic();
+      if (action === "simulate-correct-feedback") handleFeedback("correct");
+      if (action === "simulate-wrong-feedback") handleFeedback("wrong");
+      if (action === "simulate-completion-feedback") handleFeedback("completion");
       if (action === "test-word") pronounceDutch("de tafel", { source: "diagnostic word" });
       if (action === "test-sentence") pronounceDutch("Ik leer Nederlands.", { source: "diagnostic sentence" });
       render();
@@ -587,14 +708,13 @@ function renderLessonStart() {
   const dailyPercent = Math.min(100, Math.round((dailyDone / DAILY_GOAL_LESSONS) * 100));
   const lastAttempt = state.progress.failedAttempts[state.progress.failedAttempts.length - 1];
 
-  els.practiceTitle.textContent = "Today's Lesson";
+  els.practiceTitle.textContent = "Continue learning";
   els.practiceMeta.textContent = `${LESSON_ESTIMATE_MINUTES} • ${LESSON_SIZE} exercises`;
   els.exerciseArea.innerHTML = `
     <div class="lesson-card today-card">
       <p class="prompt-label">Today</p>
-      <h3>Keep your Dutch moving</h3>
-      <p class="hint">Reviews come first, then new words, then extra practice for weak words. ${CONTENT_MODE === "preview" ? "Preview mode uses the staged v3 pack and Duome vocabulary." : ""}</p>
-      ${grammarTipHtml(grammarTipForPlan(plan))}
+      <h3>Start today's lesson</h3>
+      <p class="hint">A short sentence-first session with review, new practice, and weak items mixed in. ${CONTENT_MODE === "preview" ? "Preview mode uses the staged v3 pack and Duome vocabulary." : ""}</p>
       <div class="today-rings">
         <div>
           <strong>${plan.newWords.length}</strong>
@@ -609,6 +729,7 @@ function renderLessonStart() {
           <span>duration</span>
         </div>
       </div>
+      ${grammarTipHtml(selectGrammarTipsForLesson(state.topic, lessonLevelForTopic(state.topic), 1)[0])}
       <div class="daily-goal">
         <div class="lesson-progress">
           <span>Daily goal</span>
@@ -619,7 +740,7 @@ function renderLessonStart() {
         </div>
       </div>
       ${lastAttempt ? `<p class="hint">Missed words from your last attempt will be prioritized next.</p>` : ""}
-      <button id="startLesson" class="primary-button" type="button" data-action="start-lesson" onclick="window.dutchTrainerActions.startLesson()">Start lesson</button>
+      <button id="startLesson" class="primary-button" type="button" data-action="start-lesson" onclick="window.dutchTrainerActions.startLesson()">Continue learning</button>
       <button class="secondary-button" type="button" onclick="window.dutchTrainerActions.startVocabularyPractice()">Vocabulary warm-up</button>
     </div>
   `;
@@ -634,6 +755,7 @@ function renderMultipleChoice(task) {
 
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
+    ${grammarCheckpointHtml()}
     ${promptHtml(taskPrompt(task), taskPromptLabel(task), taskPromptSpeechText(task))}
     <div class="choice-grid">
       ${choices.map((choice) => `<button class="choice-button" type="button" data-answer="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join("")}
@@ -642,7 +764,7 @@ function renderMultipleChoice(task) {
   `;
 
   els.exerciseArea.querySelectorAll(".choice-button").forEach((button) => {
-    button.addEventListener("click", () => answerTask(task, button.dataset.answer));
+    button.addEventListener("click", async () => answerTask(task, button.dataset.answer));
   });
 }
 
@@ -650,6 +772,7 @@ function renderTyped(task) {
   const targetLanguage = task.direction === "en_to_nl" ? "Dutch" : "English";
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
+    ${grammarCheckpointHtml()}
     ${promptHtml(taskPrompt(task), `Type the ${targetLanguage} translation`, taskPromptSpeechText(task))}
     <input id="answerInput" class="answer-input" autocomplete="off" autocapitalize="none" placeholder="${targetLanguage} translation">
     <button id="checkTyped" class="primary-button" type="button" data-action="check-typed" onclick="window.dutchTrainerActions.checkTyped()">Check</button>
@@ -657,8 +780,8 @@ function renderTyped(task) {
   `;
 
   const input = document.querySelector("#answerInput");
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") answerTask(task, input.value);
+  input.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") await answerTask(task, input.value);
   });
   if (!task.answered) input.focus();
 }
@@ -666,6 +789,7 @@ function renderTyped(task) {
 function renderMatching(task) {
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
+    ${grammarCheckpointHtml()}
     <p class="hint">Match each Dutch word to English. One mistake makes this exercise incorrect, but you can still finish the set.</p>
     <div class="match-columns">
       <div class="match-grid">
@@ -683,13 +807,13 @@ function renderMatching(task) {
   `;
 
   els.exerciseArea.querySelectorAll(".match-button").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       if (task.answered) return;
       if (button.dataset.side === "dutch") {
         state.selectedDutchId = button.dataset.value;
       }
       if (button.dataset.side === "english") state.selectedEnglish = button.dataset.value;
-      tryMatch(task);
+      await tryMatch(task);
       render();
     });
   });
@@ -745,6 +869,7 @@ function startLesson(options = {}) {
     correct: 0,
     incorrectIds: [],
     answeredTaskIds: [],
+    grammarTips: selectGrammarTipsForLesson(state.topic, lessonLevelForTopic(state.topic), 3),
     xpEarned: 0,
     finished: false
   };
@@ -855,36 +980,41 @@ function matchingItemsFor(primaryItem) {
   return uniqueById([primaryWord, ...shuffle(candidates)]).slice(0, 3);
 }
 
-function answerTask(task, answer) {
+async function answerTask(task, answer) {
   if (task.answered) return;
 
+  await unlockAudio();
   const expected = taskAnswer(task);
-  const correct = isAcceptedAnswer(task, answer, expected);
+  const correct = isAnswerCorrect(answer, task.item, task.direction);
   task.answered = true;
   state.feedback = correct ? "Correct!" : `Answer: ${expected}`;
+  recordAnswerCheckResult(correct);
   if (task.direction === "en_to_nl" && correct) {
     pronounceDutch(answer, { source: "selected answer" });
   }
   if (!correct) pronounceDutchAnswer(task, expected);
-  finishTask(task, correct, [task.item]);
+  await finishTask(task, correct, [task.item]);
   render();
 }
 
-function tryMatch(task) {
+async function tryMatch(task) {
   if (!state.selectedDutchId || !state.selectedEnglish) return;
 
+  await unlockAudio();
   const item = task.items.find((candidate) => candidate.id === state.selectedDutchId);
   const correct = item && item.english === state.selectedEnglish;
 
   if (correct) {
     task.matchedIds.push(item.id);
     state.feedback = "Correct!";
-    playCorrectSound();
+    recordAnswerCheckResult(true);
+    await handleFeedback("correct", { source: "answer-check" });
   } else if (item) {
     task.hadMistake = true;
     state.feedback = `Answer: ${displayDutch(item)} = ${item.english}`;
     pronounceDutch(pronunciationText(item), { source: "answer reveal" });
-    playWrongSound();
+    recordAnswerCheckResult(false);
+    await handleFeedback("wrong", { source: "answer-check" });
   }
 
   state.selectedDutchId = "";
@@ -892,11 +1022,11 @@ function tryMatch(task) {
 
   if (task.matchedIds.length === task.items.length) {
     task.answered = true;
-    finishTask(task, !task.hadMistake, task.items, { soundAlreadyPlayed: true });
+    await finishTask(task, !task.hadMistake, task.items, { soundAlreadyPlayed: true });
   }
 }
 
-function finishTask(task, correct, items, options = {}) {
+async function finishTask(task, correct, items, options = {}) {
   if (state.lesson.answeredTaskIds.includes(task.id)) return;
 
   updateStreak();
@@ -916,8 +1046,7 @@ function finishTask(task, correct, items, options = {}) {
   });
 
   if (!options.soundAlreadyPlayed) {
-    if (correct) playCorrectSound();
-    else playWrongSound();
+    await handleFeedback(correct ? "correct" : "wrong", { source: "answer-check" });
   }
   saveProgress();
   renderStats();
@@ -929,7 +1058,7 @@ function addIncorrectId(id) {
   }
 }
 
-function continueLesson() {
+async function continueLesson() {
   if (!state.lesson) return;
 
   state.feedback = "";
@@ -937,7 +1066,7 @@ function continueLesson() {
   state.selectedEnglish = "";
 
   if (state.lesson.index + 1 >= LESSON_SIZE) {
-    completeLesson();
+    await completeLesson();
   } else {
     state.lesson.index += 1;
   }
@@ -946,7 +1075,7 @@ function continueLesson() {
   render();
 }
 
-function completeLesson() {
+async function completeLesson() {
   const passed = state.lesson.correct >= PASSING_SCORE;
   const xpEarned = calculateLessonXp(passed);
   const summary = {
@@ -964,7 +1093,7 @@ function completeLesson() {
   if (passed) {
     state.progress.xp += xpEarned;
     state.progress.completedLessons.push(summary);
-    playCompletionSound();
+    await handleFeedback("completion", { source: "lesson-pass" });
   } else {
     state.progress.xp += xpEarned;
     state.progress.failedAttempts.push(summary);
@@ -1068,6 +1197,43 @@ function nextReviewEstimate() {
   return `${days} days`;
 }
 
+function cefrProgressRows() {
+  const completed = state.progress.completedLessons.length;
+  const lessonTargets = {
+    A0: 5,
+    "A1.1": 20,
+    "A1.2": 25,
+    "A2.1": 30,
+    "A2.2": 30,
+    "B1.1": 25,
+    "B1.2": 20
+  };
+  let remainingCompleted = completed;
+  let foundCurrent = false;
+
+  return LEVEL_SEQUENCE.map((id) => {
+    const target = lessonTargets[id] || 1;
+    const done = Math.min(target, Math.max(0, remainingCompleted));
+    remainingCompleted -= done;
+    const percent = Math.round((done / target) * 100);
+    let status = "locked";
+
+    if (percent >= 100) {
+      status = "done";
+    } else if (!foundCurrent) {
+      status = "current";
+      foundCurrent = true;
+    }
+
+    return { id, percent, status };
+  });
+}
+
+function currentGrammarTip() {
+  const plan = buildLessonPlan();
+  return grammarTipForPlan(plan);
+}
+
 function grammarTipForPlan(plan) {
   const level = lessonLevelForTopic(state.topic);
   return state.grammarNotes.find((note) => {
@@ -1080,14 +1246,40 @@ function grammarTipForPlan(plan) {
   }) || state.grammarNotes.find((note) => note.level === level) || null;
 }
 
+function selectGrammarTipsForLesson(topic, level, count = 3) {
+  const relevant = state.grammarNotes.filter((note) => {
+    const topics = note.linkedTopics || [];
+    const groups = note.linkedLessonGroups || [];
+    return note.level === level && (
+      topics.includes(topic) ||
+      groups.some((groupId) => state.lessonPlan.some((lesson) => lesson.lessonGroupId === groupId && (lesson.topic === topic || lesson.lessonGroupName === topic)))
+    );
+  });
+  const sameLevel = state.grammarNotes.filter((note) => note.level === level);
+  return uniqueById([...relevant, ...sameLevel, ...state.grammarNotes]).slice(0, count);
+}
+
+function grammarCheckpointHtml() {
+  if (!state.lesson?.grammarTips?.length) return "";
+  const checkpointMap = {
+    6: 1,
+    13: 2
+  };
+  const tipIndex = checkpointMap[state.lesson.index];
+  if (tipIndex === undefined) return "";
+  return grammarTipHtml(state.lesson.grammarTips[tipIndex % state.lesson.grammarTips.length]);
+}
+
 function grammarTipHtml(note) {
   if (!note) return "";
   const examples = (note.examples || []).slice(0, 2);
   return `
-    <aside class="grammar-tip">
-      <p class="prompt-label">💡 Grammar Tip</p>
-      <h4>${escapeHtml(note.title)}</h4>
-      <p>${escapeHtml(note.explanation)}</p>
+    <details class="grammar-tip">
+      <summary>
+        <span>Grammar tip</span>
+        <strong>${escapeHtml(note.title)}</strong>
+      </summary>
+      <p>${escapeHtml(shortGrammarExplanation(note.explanation))}</p>
       ${examples.length ? `
         <div class="grammar-examples">
           ${examples.map((example) => `
@@ -1095,14 +1287,19 @@ function grammarTipHtml(note) {
           `).join("")}
         </div>
       ` : ""}
-    </aside>
+    </details>
   `;
 }
 
+function shortGrammarExplanation(text) {
+  const value = String(text || "");
+  return value.length > 150 ? `${value.slice(0, 147)}...` : value;
+}
+
 function sentenceTargetForLevel(level) {
-  if (level === "B1") return 16;
-  if (level === "A2") return 14;
-  return 12;
+  if (level === "B1") return 17;
+  if (level === "A2") return 15;
+  return 13;
 }
 
 function lessonLevelForTopic(topic) {
@@ -1126,9 +1323,9 @@ function sentencesForTopic(topic) {
 
 function answerChoices(task) {
   const item = task.item;
-  const expected = taskAnswer(task);
+  const expected = choiceAnswerForDirection(item, task.direction);
   const allAnswers = allPracticeItems()
-    .map((candidate) => answerForDirection(candidate, task.direction))
+    .map((candidate) => choiceAnswerForDirection(candidate, task.direction))
     .filter((answer) => answer !== expected);
 
   return shuffle([expected, ...shuffle([...new Set(allAnswers)]).slice(0, 3)]);
@@ -1143,6 +1340,9 @@ function updateSrs(item, correct) {
   if (correct) {
     record.totalCorrect += 1;
     record.repetitions += 1;
+    if (record.totalIncorrect > 0) {
+      record.weakCorrectStreak = (record.weakCorrectStreak || 0) + 1;
+    }
     record.easeFactor = Math.min(2.8, record.easeFactor + 0.05);
 
     if (record.repetitions === 1) {
@@ -1154,6 +1354,7 @@ function updateSrs(item, correct) {
     }
   } else {
     record.totalIncorrect += 1;
+    record.weakCorrectStreak = 0;
     record.repetitions = Math.max(0, record.repetitions - 1);
     record.easeFactor = Math.max(1.3, record.easeFactor - 0.25);
     record.intervalDays = record.totalCorrect > 0 ? 1 : 0;
@@ -1174,6 +1375,7 @@ function newSrsRecord(itemId) {
     nextReviewAt: null,
     totalCorrect: 0,
     totalIncorrect: 0,
+    weakCorrectStreak: 0,
     masteryLevel: "unseen"
   };
 }
@@ -1204,6 +1406,7 @@ function loadDutchVoices() {
   const setVoice = () => {
     const voices = window.speechSynthesis.getVoices();
     voicesReady = voices.length > 0;
+    dutchVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("nl"));
     dutchVoice = chooseDutchVoice(voices);
   };
 
@@ -1215,11 +1418,22 @@ function loadDutchVoices() {
 }
 
 function chooseDutchVoice(voices) {
-  return voices.find((voice) => voice.lang === "nl-NL" && voice.localService)
-    || voices.find((voice) => voice.lang === "nl-NL")
-    || voices.find((voice) => voice.lang?.toLowerCase().startsWith("nl"))
+  const dutch = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("nl"));
+  const femalePreferred = dutch.find((voice) => isLikelyFemaleDutchVoice(voice) && voice.lang === "nl-NL")
+    || dutch.find(isLikelyFemaleDutchVoice);
+  const fallback = dutch.find((voice) => voice.lang === "nl-NL" && voice.localService)
+    || dutch.find((voice) => voice.lang === "nl-NL")
+    || dutch[0]
     || voices.find((voice) => /dutch|nederlands/i.test(`${voice.name} ${voice.lang}`))
     || null;
+
+  dutchVoiceFemalePreferred = Boolean(femalePreferred);
+  return femalePreferred || fallback;
+}
+
+function isLikelyFemaleDutchVoice(voice) {
+  return /claire|ellen|laura|nora|sara|sophie|emma|eva|lotte|colette|fenna|female|vrouw|google nederlands/i
+    .test(`${voice.name} ${voice.voiceURI || ""}`);
 }
 
 function unlockSpeech() {
@@ -1262,8 +1476,9 @@ function pronounceDutch(text, options = {}) {
   const utterance = new SpeechSynthesisUtterance(phrase);
   utterance.lang = "nl-NL";
   utterance.voice = dutchVoice;
-  utterance.rate = options.rate || 0.92;
-  utterance.pitch = 1;
+  utterance.rate = options.rate || SPEECH_RATE;
+  utterance.pitch = SPEECH_PITCH;
+  utterance.volume = SPEECH_VOLUME;
   utterance.onstart = () => {
     speechDiagnostics.lastError = "none";
     renderDeveloperPanel();
@@ -1283,6 +1498,13 @@ function selectedVoiceLabel() {
   return `${dutchVoice.name} (${dutchVoice.lang})`;
 }
 
+function availableDutchVoiceLabel() {
+  if (!speechDiagnostics.available) return "speechSynthesis unavailable";
+  if (!voicesReady) return "voices loading";
+  if (!dutchVoices.length) return "none";
+  return dutchVoices.map((voice) => `${voice.name} (${voice.lang})`).join(", ");
+}
+
 function speechStateLabel() {
   if (!speechDiagnostics.available) return "unavailable";
   if (window.speechSynthesis.speaking) return "speaking";
@@ -1291,79 +1513,134 @@ function speechStateLabel() {
   return "idle";
 }
 
-function unlockAudio() {
-  if (state.progress.soundMuted) return false;
-  if (audioUnlocked) return true;
-  if (audioContext?.state === "running") {
-    audioUnlocked = true;
-    return true;
+async function unlockAudio() {
+  if (state.progress.soundMuted) {
+    audioUnlocked = false;
+    feedbackDiagnostics.lastError = "audio off";
+    renderDeveloperPanel();
+    return false;
   }
-  if (audioUnlocking) return false;
 
   const context = getAudioContext();
   if (!context) return false;
 
   if (context.state === "running") {
     audioUnlocked = true;
+    feedbackDiagnostics.lastError = "none";
+    renderDeveloperPanel();
     return true;
   }
 
-  audioUnlocking = true;
-  context.resume()
-    .then(() => {
-      audioUnlocked = context.state === "running";
-      feedbackDiagnostics.lastError = audioUnlocked ? "none" : `AudioContext ${context.state}`;
-    })
-    .catch((error) => {
-      audioUnlocked = false;
-      feedbackDiagnostics.lastError = error?.message || "AudioContext resume failed";
-    })
-    .finally(() => {
-      audioUnlocking = false;
-      renderDeveloperPanel();
-    });
+  if (audioUnlocking) {
+    await waitForAudioUnlock();
+    return audioContext?.state === "running";
+  }
 
-  return context.state === "running";
+  audioUnlocking = true;
+  try {
+    await context.resume();
+    audioUnlocked = context.state === "running";
+    feedbackDiagnostics.lastError = audioUnlocked ? "none" : `AudioContext ${context.state}`;
+    return audioUnlocked;
+  } catch (error) {
+    audioUnlocked = false;
+    feedbackDiagnostics.lastError = error?.message || "AudioContext resume failed";
+    return false;
+  } finally {
+    audioUnlocking = false;
+    renderDeveloperPanel();
+  }
+}
+
+function waitForAudioUnlock() {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const check = () => {
+      if (!audioUnlocking || Date.now() - started > 1000) resolve();
+      else setTimeout(check, 25);
+    };
+    check();
+  });
+}
+
+async function handleFeedback(type, options = {}) {
+  recordFeedbackEvent(type, options);
+  feedbackDiagnostics.audioEnabled = !state.progress.soundMuted;
+  feedbackDiagnostics.lastType = type;
+  feedbackDiagnostics.lastAnswerCheckTriggeredFeedback = options.source === "answer-check";
+
+  if (state.progress.soundMuted) {
+    feedbackDiagnostics.lastSoundAt = timestampLabel();
+    feedbackDiagnostics.lastSoundStatus = "skipped: audio off";
+    feedbackDiagnostics.lastHapticAt = timestampLabel();
+    feedbackDiagnostics.lastHapticStatus = "skipped: audio off";
+    renderDeveloperPanel();
+    return false;
+  }
+
+  const soundPlayed = await playFeedbackSound(type);
+  triggerFeedbackHaptic(type);
+  renderDeveloperPanel();
+  return soundPlayed;
+}
+
+function recordFeedbackEvent(type) {
+  feedbackDiagnostics.lastAttempt = type;
+  if (type === "correct") feedbackDiagnostics.correctSoundCalls += 1;
+  if (type === "wrong") feedbackDiagnostics.wrongSoundCalls += 1;
+  if (type === "completion") feedbackDiagnostics.completionSoundCalls += 1;
+}
+
+function recordAnswerCheckResult(correct) {
+  feedbackDiagnostics.lastAnswerCheckResult = correct ? "correct" : "wrong";
+  feedbackDiagnostics.lastAnswerCheckTriggeredFeedback = false;
 }
 
 function playCorrectSound() {
-  playSound("correct");
-  vibrateFeedback("correct");
+  return handleFeedback("correct", { source: "diagnostic" });
 }
 
 function playWrongSound() {
-  playSound("wrong");
-  vibrateFeedback("wrong");
+  return handleFeedback("wrong", { source: "diagnostic" });
 }
 
 function playCompletionSound() {
-  playSound("complete");
-  vibrateFeedback("complete");
+  return handleFeedback("completion", { source: "diagnostic" });
 }
 
-function playSound(kind) {
-  if (state.progress.soundMuted) return;
-  feedbackDiagnostics.lastAttempt = kind;
-
+async function playFeedbackSound(type) {
+  feedbackDiagnostics.lastSoundAt = timestampLabel();
   const patterns = {
     correct: [
-      { frequency: 660, start: 0, duration: 0.06, gain: 0.055 },
-      { frequency: 880, start: 0.07, duration: 0.09, gain: 0.06 }
+      { frequency: 660, start: 0, duration: 0.06, gain: 0.06 },
+      { frequency: 880, start: 0.07, duration: 0.09, gain: 0.065 }
     ],
     wrong: [
-      { frequency: 180, start: 0, duration: 0.08, gain: 0.055 },
-      { frequency: 140, start: 0.09, duration: 0.11, gain: 0.05 }
+      { frequency: 180, start: 0, duration: 0.09, gain: 0.065, type: "triangle" },
+      { frequency: 125, start: 0.11, duration: 0.13, gain: 0.055, type: "triangle" }
     ],
-    complete: [
-      { frequency: 523, start: 0, duration: 0.08, gain: 0.055 },
-      { frequency: 659, start: 0.09, duration: 0.08, gain: 0.055 },
-      { frequency: 784, start: 0.18, duration: 0.13, gain: 0.06 }
+    completion: [
+      { frequency: 523, start: 0, duration: 0.09, gain: 0.06 },
+      { frequency: 659, start: 0.1, duration: 0.09, gain: 0.06 },
+      { frequency: 784, start: 0.2, duration: 0.1, gain: 0.065 },
+      { frequency: 1046, start: 0.33, duration: 0.16, gain: 0.055 }
     ]
   };
 
-  const pattern = patterns[kind];
-  if (!pattern) return;
-  playToneSequence(pattern);
+  const pattern = patterns[type];
+  if (!pattern) {
+    feedbackDiagnostics.lastSoundStatus = "failed";
+    feedbackDiagnostics.lastError = `Unknown feedback type: ${type}`;
+    return false;
+  }
+
+  const ready = await ensureAudioReady();
+  if (!ready) {
+    feedbackDiagnostics.lastSoundStatus = "failed";
+    return false;
+  }
+
+  return playToneSequence(pattern);
 }
 
 function getAudioContext() {
@@ -1377,70 +1654,122 @@ function getAudioContext() {
   return audioContext;
 }
 
-function playToneSequence(pattern) {
+async function ensureAudioReady() {
   const context = getAudioContext();
-  if (!context) return;
-
-  const schedule = () => {
-    try {
-      audioUnlocked = context.state === "running";
-      const startBase = context.currentTime + 0.015;
-      pattern.forEach((tone) => {
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        const startsAt = startBase + tone.start;
-        const endsAt = startsAt + tone.duration;
-
-        oscillator.type = tone.type || "sine";
-        oscillator.frequency.setValueAtTime(tone.frequency, startsAt);
-        gain.gain.setValueAtTime(0.0001, startsAt);
-        gain.gain.exponentialRampToValueAtTime(tone.gain || 0.05, startsAt + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, endsAt);
-
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start(startsAt);
-        oscillator.stop(endsAt + 0.02);
-      });
-      feedbackDiagnostics.lastError = "none";
-      renderDeveloperPanel();
-    } catch (error) {
-      feedbackDiagnostics.lastError = error?.message || "tone scheduling failed";
-      renderDeveloperPanel();
-    }
-  };
-
-  if (context.state === "running") {
-    schedule();
-    return;
+  if (!context) {
+    feedbackDiagnostics.lastSoundStatus = "failed";
+    return false;
   }
 
-  context.resume()
-    .then(() => {
-      if (context.state === "running") schedule();
-      else {
-        feedbackDiagnostics.lastError = `AudioContext ${context.state}`;
-        renderDeveloperPanel();
-      }
-    })
-    .catch((error) => {
-      feedbackDiagnostics.lastError = error?.message || "AudioContext resume failed";
-      renderDeveloperPanel();
-    });
+  if (context.state !== "running") {
+    const unlocked = await unlockAudio();
+    if (!unlocked || context.state !== "running") {
+      feedbackDiagnostics.lastSoundStatus = "failed";
+      feedbackDiagnostics.lastError = feedbackDiagnostics.lastError || `AudioContext ${context.state}`;
+      return false;
+    }
+  }
+
+  audioUnlocked = true;
+  return true;
 }
 
-function vibrateFeedback(kind) {
-  if (state.progress.soundMuted || !hapticsSupported()) return;
+function playToneSequence(pattern) {
+  const context = getAudioContext();
+  if (!context || context.state !== "running") {
+    feedbackDiagnostics.lastSoundStatus = "failed";
+    feedbackDiagnostics.lastError = context ? `AudioContext ${context.state}` : "AudioContext unavailable";
+    renderDeveloperPanel();
+    return false;
+  }
+
+  try {
+    audioUnlocked = true;
+    const startBase = context.currentTime + 0.015;
+    pattern.forEach((tone) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startsAt = startBase + tone.start;
+      const endsAt = startsAt + tone.duration;
+
+      oscillator.type = tone.type || "sine";
+      oscillator.frequency.setValueAtTime(tone.frequency, startsAt);
+      gain.gain.setValueAtTime(0.0001, startsAt);
+      gain.gain.exponentialRampToValueAtTime(tone.gain || 0.05, startsAt + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endsAt);
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(startsAt);
+      oscillator.stop(endsAt + 0.02);
+    });
+    feedbackDiagnostics.lastSoundStatus = "success";
+    feedbackDiagnostics.lastError = "none";
+    renderDeveloperPanel();
+    return true;
+  } catch (error) {
+    feedbackDiagnostics.lastSoundStatus = "failed";
+    feedbackDiagnostics.lastError = error?.message || "tone scheduling failed";
+    renderDeveloperPanel();
+    return false;
+  }
+}
+
+function triggerCorrectHaptic() {
+  return triggerFeedbackHaptic("correct");
+}
+
+function triggerWrongHaptic() {
+  return triggerFeedbackHaptic("wrong");
+}
+
+function triggerCompletionHaptic() {
+  return triggerFeedbackHaptic("completion");
+}
+
+function triggerFeedbackHaptic(type) {
+  feedbackDiagnostics.lastHapticAt = timestampLabel();
+  if (type === "correct") feedbackDiagnostics.correctHapticCalls += 1;
+  if (type === "wrong") feedbackDiagnostics.wrongHapticCalls += 1;
+  if (type === "completion") feedbackDiagnostics.completionHapticCalls += 1;
+
+  if (state.progress.soundMuted) {
+    feedbackDiagnostics.lastHapticStatus = "skipped: audio off";
+    renderDeveloperPanel();
+    return false;
+  }
+
+  if (!hapticsSupported()) {
+    feedbackDiagnostics.lastHapticStatus = "unsupported";
+    renderDeveloperPanel();
+    return false;
+  }
+
   const patterns = {
     correct: 20,
-    wrong: [30, 40, 30],
-    complete: [40, 30, 40, 30, 60]
+    wrong: [40, 40, 40],
+    completion: [40, 30, 40, 30, 80]
   };
-  navigator.vibrate(patterns[kind] || 0);
+
+  try {
+    const ok = navigator.vibrate(patterns[type] || 0);
+    feedbackDiagnostics.lastHapticStatus = ok ? "success" : "failed";
+    renderDeveloperPanel();
+    return ok;
+  } catch (error) {
+    feedbackDiagnostics.lastHapticStatus = "failed";
+    feedbackDiagnostics.lastError = error?.message || "haptic failed";
+    renderDeveloperPanel();
+    return false;
+  }
 }
 
 function hapticsSupported() {
   return "vibrate" in navigator;
+}
+
+function timestampLabel() {
+  return new Date().toLocaleTimeString();
 }
 
 function audioContextAvailable() {
@@ -1508,11 +1837,26 @@ function weakItems() {
     });
 }
 
+function weakerWords() {
+  return state.words
+    .map((item) => ({ ...item, kind: "word" }))
+    .filter((item) => {
+      const srs = state.progress.srs[item.id];
+      return srs && srs.totalIncorrect > 0 && (srs.weakCorrectStreak || 0) < 2;
+    })
+    .sort((a, b) => {
+      const aRecord = state.progress.srs[a.id];
+      const bRecord = state.progress.srs[b.id];
+      return (bRecord.totalIncorrect - aRecord.totalIncorrect) || ((aRecord.weakCorrectStreak || 0) - (bRecord.weakCorrectStreak || 0));
+    });
+}
+
 function missedItems() {
   const lastAttempt = state.progress.failedAttempts[state.progress.failedAttempts.length - 1];
-  if (!lastAttempt) return weakItems();
+  if (!lastAttempt) return uniqueById([...weakerWords(), ...weakItems()]);
   return uniqueById([
     ...lastAttempt.incorrectIds.map((id) => findItemById(id)).filter(Boolean),
+    ...weakerWords(),
     ...weakItems()
   ]);
 }
@@ -1574,6 +1918,10 @@ function answerForDirection(item, direction) {
   return direction === "en_to_nl" ? displayDutch(item) : item.english;
 }
 
+function choiceAnswerForDirection(item, direction) {
+  return direction === "en_to_nl" ? displayDutch(item) : getAcceptedAnswers(item)[0];
+}
+
 function taskPromptLabel(task) {
   return task.direction === "en_to_nl" ? "Translate to Dutch" : "Translate to English";
 }
@@ -1590,12 +1938,51 @@ function displayDutch(item) {
   return item.kind === "word" ? (item.displayDutch || item.dutch) : item.dutch;
 }
 
-function isAcceptedAnswer(task, answer, expected) {
-  if (normalize(answer) === normalize(expected)) return true;
-  if (task.direction === "en_to_nl" && task.item.kind === "word" && task.item.bareDutch) {
-    return normalize(answer) === normalize(task.item.bareDutch);
+function isAnswerCorrect(answer, item, direction) {
+  if (direction === "en_to_nl") {
+    const acceptedDutch = [displayDutch(item), item.dutch, item.bareDutch].filter(Boolean);
+    return acceptedDutch.some((value) => normalizeAnswer(answer, { ignoreEnglishArticles: false }) === normalizeAnswer(value, { ignoreEnglishArticles: false }));
   }
-  return false;
+  const normalized = normalizeAnswer(answer);
+  return getAcceptedAnswers(item).some((accepted) => normalizeAnswer(accepted) === normalized);
+}
+
+function getAcceptedAnswers(item) {
+  const values = [];
+  if (Array.isArray(item.acceptedAnswers)) values.push(...item.acceptedAnswers);
+  if (Array.isArray(item.aliases)) values.push(...item.aliases);
+  if (item.english) values.push(...String(item.english).split(/[;,]/));
+
+  return uniqueStrings(values.map((value) => {
+    const cleaned = String(value)
+      .replace(/\([^)]*\)/g, "")
+      .replace(/\[[^\]]*\]/g, "")
+      .trim();
+    return cleaned;
+  }).filter(Boolean));
+}
+
+function normalizeAnswer(text, options = { ignoreEnglishArticles: true }) {
+  let value = String(text || "")
+    .toLowerCase()
+    .replace(/[’‘`´]/g, "'")
+    .replace(/[.,!?;:"()[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (options.ignoreEnglishArticles) {
+    value = value.replace(/^(the|a|an)\s+/, "");
+  }
+  return value;
+}
+
+function uniqueStrings(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = normalizeAnswer(value, { ignoreEnglishArticles: false });
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function pronounceDutchAnswer(task, expected) {

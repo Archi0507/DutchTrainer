@@ -80,7 +80,23 @@
           <div id="exerciseArea" class="exercise-area"></div>
         </section>
 
-        <section class="panel vocab-panel">
+        <section class="panel cefr-panel">
+          <div class="section-title">
+            <h2>Your Dutch path</h2>
+            <span id="cefrCurrent">A0</span>
+          </div>
+          <div id="cefrProgress" class="cefr-progress"></div>
+        </section>
+
+        <section class="panel review-panel">
+          <div class="section-title">
+            <h2>Review weaker words</h2>
+            <span id="reviewSummaryMeta">Ready</span>
+          </div>
+          <div id="reviewSummary" class="review-summary"></div>
+        </section>
+
+        <section class="panel vocab-panel" hidden>
           <div class="section-title">
             <h2>Vocabulary</h2>
             <span id="vocabCount">Words</span>
@@ -90,7 +106,7 @@
 
         <section class="panel">
           <div class="section-title">
-            <h2>Topics</h2>
+            <h2>Practice by topic</h2>
             <span id="topicCount">Loading</span>
           </div>
           <div id="topicList" class="topic-list"></div>
@@ -106,6 +122,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=21" type="module"></script>
+    <script src="app.js?v=24" type="module"></script>
   </body>
 </html>
