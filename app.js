@@ -61,6 +61,10 @@ const speechDiagnostics = {
   lastAttempt: "none",
   lastError: "none"
 };
+const feedbackDiagnostics = {
+  lastAttempt: "none",
+  lastError: "none"
+};
 let devPanel;
 
 init();
@@ -240,9 +244,14 @@ function renderProfile() {
 }
 
 function renderSoundButton() {
-  els.soundToggle.textContent = state.progress.soundMuted ? "🔇 Audio Off" : "🔊 Audio On";
-  els.soundToggle.setAttribute("aria-label", state.progress.soundMuted ? "Turn audio on" : "Turn audio off");
-  els.soundToggle.setAttribute("aria-pressed", String(!state.progress.soundMuted));
+  const enabled = !state.progress.soundMuted;
+  els.soundToggle.classList.toggle("active", enabled);
+  els.soundToggle.innerHTML = `
+    ${enabled ? speakerIconSvg() : mutedSpeakerIconSvg()}
+    <span>Audio</span>
+  `;
+  els.soundToggle.setAttribute("aria-label", enabled ? "Turn audio off" : "Turn audio on");
+  els.soundToggle.setAttribute("aria-pressed", String(enabled));
 }
 
 function renderTopics() {
@@ -377,6 +386,11 @@ function renderDeveloperPanel() {
       <button type="button" data-dev-action="due">Mark 10 items due</button>
       <button type="button" data-dev-action="pass">Simulate passing a lesson</button>
       <button type="button" data-dev-action="fail">Simulate failing a lesson</button>
+      <button type="button" data-dev-action="test-correct-sound">Test Correct Sound</button>
+      <button type="button" data-dev-action="test-wrong-sound">Test Wrong Sound</button>
+      <button type="button" data-dev-action="test-completion-sound">Test Completion Sound</button>
+      <button type="button" data-dev-action="test-haptic-correct">Test Haptic Correct</button>
+      <button type="button" data-dev-action="test-haptic-wrong">Test Haptic Wrong</button>
       <button type="button" data-dev-action="test-word">Test Dutch Word</button>
       <button type="button" data-dev-action="test-sentence">Test Dutch Sentence</button>
     </div>
@@ -386,11 +400,17 @@ function renderDeveloperPanel() {
         <div><dt>Speech synthesis available</dt><dd>${speechDiagnostics.available ? "yes" : "no"}</dd></div>
         <div><dt>Selected Dutch voice</dt><dd>${escapeHtml(selectedVoiceLabel())}</dd></div>
         <div><dt>Audio enabled</dt><dd>${state.progress.soundMuted ? "no" : "yes"}</dd></div>
+        <div><dt>Pronunciation enabled</dt><dd>${state.progress.soundMuted ? "no" : "yes"}</dd></div>
+        <div><dt>AudioContext available</dt><dd>${audioContextAvailable() ? "yes" : "no"}</dd></div>
+        <div><dt>AudioContext state</dt><dd>${escapeHtml(audioContextStateLabel())}</dd></div>
         <div><dt>Audio unlocked</dt><dd>${audioUnlocked ? "yes" : "no"}</dd></div>
         <div><dt>Speech unlocked</dt><dd>${speechUnlocked ? "yes" : "no"}</dd></div>
         <div><dt>Speech synthesis state</dt><dd>${escapeHtml(speechStateLabel())}</dd></div>
         <div><dt>Last pronunciation attempted</dt><dd>${escapeHtml(speechDiagnostics.lastAttempt)}</dd></div>
         <div><dt>Last speech error</dt><dd>${escapeHtml(speechDiagnostics.lastError)}</dd></div>
+        <div><dt>Last feedback sound attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastAttempt)}</dd></div>
+        <div><dt>Last feedback sound error</dt><dd>${escapeHtml(feedbackDiagnostics.lastError)}</dd></div>
+        <div><dt>Haptics supported</dt><dd>${hapticsSupported() ? "yes" : "no"}</dd></div>
       </dl>
     </div>
     <div class="srs-debug">
@@ -435,6 +455,11 @@ function renderDeveloperPanel() {
       if (action === "due") markItemsDue();
       if (action === "pass") simulatePassingLesson();
       if (action === "fail") simulateFailingLesson();
+      if (action === "test-correct-sound") playCorrectSound();
+      if (action === "test-wrong-sound") playWrongSound();
+      if (action === "test-completion-sound") playCompletionSound();
+      if (action === "test-haptic-correct") vibrateFeedback("correct");
+      if (action === "test-haptic-wrong") vibrateFeedback("wrong");
       if (action === "test-word") pronounceDutch("de tafel", { source: "diagnostic word" });
       if (action === "test-sentence") pronounceDutch("Ik leer Nederlands.", { source: "diagnostic sentence" });
       render();
@@ -943,7 +968,6 @@ function completeLesson() {
   } else {
     state.progress.xp += xpEarned;
     state.progress.failedAttempts.push(summary);
-    playWrongSound();
   }
 
   state.lesson.xpEarned = xpEarned;
@@ -989,8 +1013,15 @@ function promptHtml(text, label, speakText = "") {
 function feedbackHtml(showNext = true) {
   if (!state.feedback) return `<p class="feedback"></p>`;
   const kind = state.feedback === "Correct!" ? "correct" : "wrong";
+  const label = kind === "correct" ? "Correct" : "Correct answer";
+  const message = kind === "correct"
+    ? "Nice work."
+    : state.feedback.replace(/^Answer:\s*/, "");
   return `
-    <p class="feedback ${kind}">${escapeHtml(state.feedback)}</p>
+    <p class="feedback ${kind}">
+      <span>${label}</span>
+      <strong>${escapeHtml(message)}</strong>
+    </p>
     ${showNext ? '<button id="continueLesson" class="primary-button" type="button" data-action="continue-lesson" onclick="window.dutchTrainerActions.continueLesson()">Continue</button>' : ""}
   `;
 }
@@ -1261,7 +1292,7 @@ function speechStateLabel() {
 }
 
 function unlockAudio() {
-  if (state.progress.soundMuted) return;
+  if (state.progress.soundMuted) return false;
   if (audioUnlocked) return true;
   if (audioContext?.state === "running") {
     audioUnlocked = true;
@@ -1269,74 +1300,156 @@ function unlockAudio() {
   }
   if (audioUnlocking) return false;
 
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return false;
+  const context = getAudioContext();
+  if (!context) return false;
 
-  audioContext ||= new AudioContext();
-
-  if (audioContext.state === "running") {
+  if (context.state === "running") {
     audioUnlocked = true;
     return true;
   }
 
   audioUnlocking = true;
-  audioContext.resume()
+  context.resume()
     .then(() => {
-      audioUnlocked = audioContext.state === "running";
+      audioUnlocked = context.state === "running";
+      feedbackDiagnostics.lastError = audioUnlocked ? "none" : `AudioContext ${context.state}`;
     })
-    .catch(() => {
+    .catch((error) => {
       audioUnlocked = false;
+      feedbackDiagnostics.lastError = error?.message || "AudioContext resume failed";
     })
     .finally(() => {
       audioUnlocking = false;
+      renderDeveloperPanel();
     });
 
-  return audioContext.state === "running";
+  return context.state === "running";
 }
 
 function playCorrectSound() {
   playSound("correct");
+  vibrateFeedback("correct");
 }
 
 function playWrongSound() {
   playSound("wrong");
+  vibrateFeedback("wrong");
 }
 
 function playCompletionSound() {
   playSound("complete");
+  vibrateFeedback("complete");
 }
 
 function playSound(kind) {
   if (state.progress.soundMuted) return;
-  if (audioContext?.state === "running") audioUnlocked = true;
-  if (!audioUnlocked && !unlockAudio()) return;
+  feedbackDiagnostics.lastAttempt = kind;
 
   const patterns = {
-    correct: [{ frequency: 660, start: 0, duration: 0.08 }, { frequency: 880, start: 0.08, duration: 0.1 }],
-    wrong: [{ frequency: 220, start: 0, duration: 0.16 }],
-    complete: [{ frequency: 523, start: 0, duration: 0.1 }, { frequency: 659, start: 0.1, duration: 0.1 }, { frequency: 784, start: 0.2, duration: 0.16 }]
+    correct: [
+      { frequency: 660, start: 0, duration: 0.06, gain: 0.055 },
+      { frequency: 880, start: 0.07, duration: 0.09, gain: 0.06 }
+    ],
+    wrong: [
+      { frequency: 180, start: 0, duration: 0.08, gain: 0.055 },
+      { frequency: 140, start: 0.09, duration: 0.11, gain: 0.05 }
+    ],
+    complete: [
+      { frequency: 523, start: 0, duration: 0.08, gain: 0.055 },
+      { frequency: 659, start: 0.09, duration: 0.08, gain: 0.055 },
+      { frequency: 784, start: 0.18, duration: 0.13, gain: 0.06 }
+    ]
   };
 
   const pattern = patterns[kind];
-  if (!pattern || !audioContext) return;
+  if (!pattern) return;
+  playToneSequence(pattern);
+}
 
-  pattern.forEach((tone) => {
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    const startsAt = audioContext.currentTime + tone.start;
-    const endsAt = startsAt + tone.duration;
+function getAudioContext() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) {
+    feedbackDiagnostics.lastError = "AudioContext unavailable";
+    renderDeveloperPanel();
+    return null;
+  }
+  audioContext ||= new AudioContext();
+  return audioContext;
+}
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(tone.frequency, startsAt);
-    gain.gain.setValueAtTime(0.0001, startsAt);
-    gain.gain.exponentialRampToValueAtTime(0.08, startsAt + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, endsAt);
+function playToneSequence(pattern) {
+  const context = getAudioContext();
+  if (!context) return;
 
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-    oscillator.start(startsAt);
-    oscillator.stop(endsAt + 0.02);
-  });
+  const schedule = () => {
+    try {
+      audioUnlocked = context.state === "running";
+      const startBase = context.currentTime + 0.015;
+      pattern.forEach((tone) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const startsAt = startBase + tone.start;
+        const endsAt = startsAt + tone.duration;
+
+        oscillator.type = tone.type || "sine";
+        oscillator.frequency.setValueAtTime(tone.frequency, startsAt);
+        gain.gain.setValueAtTime(0.0001, startsAt);
+        gain.gain.exponentialRampToValueAtTime(tone.gain || 0.05, startsAt + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, endsAt);
+
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(startsAt);
+        oscillator.stop(endsAt + 0.02);
+      });
+      feedbackDiagnostics.lastError = "none";
+      renderDeveloperPanel();
+    } catch (error) {
+      feedbackDiagnostics.lastError = error?.message || "tone scheduling failed";
+      renderDeveloperPanel();
+    }
+  };
+
+  if (context.state === "running") {
+    schedule();
+    return;
+  }
+
+  context.resume()
+    .then(() => {
+      if (context.state === "running") schedule();
+      else {
+        feedbackDiagnostics.lastError = `AudioContext ${context.state}`;
+        renderDeveloperPanel();
+      }
+    })
+    .catch((error) => {
+      feedbackDiagnostics.lastError = error?.message || "AudioContext resume failed";
+      renderDeveloperPanel();
+    });
+}
+
+function vibrateFeedback(kind) {
+  if (state.progress.soundMuted || !hapticsSupported()) return;
+  const patterns = {
+    correct: 20,
+    wrong: [30, 40, 30],
+    complete: [40, 30, 40, 30, 60]
+  };
+  navigator.vibrate(patterns[kind] || 0);
+}
+
+function hapticsSupported() {
+  return "vibrate" in navigator;
+}
+
+function audioContextAvailable() {
+  return Boolean(window.AudioContext || window.webkitAudioContext);
+}
+
+function audioContextStateLabel() {
+  if (!audioContextAvailable()) return "unavailable";
+  return audioContext?.state || "not created";
 }
 
 function isDue(id) {
@@ -1611,4 +1724,24 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function speakerIconSvg() {
+  return `
+    <svg class="audio-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
+      <path d="M16 8.5a4.5 4.5 0 0 1 0 7"></path>
+      <path d="M18.5 6a8 8 0 0 1 0 12"></path>
+    </svg>
+  `;
+}
+
+function mutedSpeakerIconSvg() {
+  return `
+    <svg class="audio-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
+      <path d="M17 9l4 4"></path>
+      <path d="M21 9l-4 4"></path>
+    </svg>
+  `;
 }
