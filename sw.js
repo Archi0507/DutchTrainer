@@ -1,4 +1,4 @@
-const CACHE_NAME = "dutchtrainer-v10";
+const CACHE_NAME = "dutchtrainer-v15";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,8 +6,15 @@ const APP_SHELL = [
   "./app.js",
   "./manifest.webmanifest",
   "./icons/icon.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/apple-touch-icon.png",
   "./data/vocabulary.json",
   "./data/sentences.json",
+  "./data/lesson-plan.json",
+  "./data-preview/vocabulary.json",
+  "./data-preview/sentences.json",
+  "./data-preview/lesson-plan.json",
   "./tests/browser-tests.html",
   "./tests/browser-tests.js"
 ];

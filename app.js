@@ -8,10 +8,14 @@ const FAIL_XP = 10;
 const HIGH_ACCURACY_BONUS_XP = 30;
 const PERFECT_BONUS_XP = 50;
 const STREAK_BONUS_XP = 15;
+const CONTENT_MODE = new URLSearchParams(window.location.search).get("content") === "preview" ? "preview" : "live";
+const DATA_ROOT = CONTENT_MODE === "preview" ? "data-preview" : "data";
+const PROGRESS_KEY = CONTENT_MODE === "preview" ? "dutchTrainerProgressPreview" : "dutchTrainerProgress";
 
 const state = {
   words: [],
   sentences: [],
+  lessonPlan: [],
   topic: "",
   lesson: null,
   feedback: "",
@@ -24,8 +28,18 @@ const els = {
   xp: document.querySelector("#xpValue"),
   streak: document.querySelector("#streakValue"),
   due: document.querySelector("#dueValue"),
+  learnerName: document.querySelector("#learnerNameInput"),
+  profileStreak: document.querySelector("#profileStreak"),
+  profileXp: document.querySelector("#profileXp"),
+  profileWords: document.querySelector("#profileWords"),
+  profileDue: document.querySelector("#profileDue"),
   topicCount: document.querySelector("#topicCount"),
   topicList: document.querySelector("#topicList"),
+  contentModeBadge: document.querySelector("#contentModeBadge"),
+  pathCount: document.querySelector("#pathCount"),
+  lessonPath: document.querySelector("#lessonPath"),
+  vocabCount: document.querySelector("#vocabCount"),
+  vocabPractice: document.querySelector("#vocabPractice"),
   practiceTitle: document.querySelector("#practiceTitle"),
   practiceMeta: document.querySelector("#practiceMeta"),
   exerciseArea: document.querySelector("#exerciseArea"),
@@ -43,13 +57,15 @@ async function init() {
   applySavedTheme();
   bindEvents();
 
-  const [words, sentences] = await Promise.all([
-    fetchJson("data/vocabulary.json"),
-    fetchJson("data/sentences.json")
+  const [words, sentences, lessonPlan] = await Promise.all([
+    fetchJson(`${DATA_ROOT}/vocabulary.json`),
+    fetchJson(`${DATA_ROOT}/sentences.json`),
+    fetchOptionalJson(`${DATA_ROOT}/lesson-plan.json`)
   ]);
 
   state.words = words;
   state.sentences = sentences;
+  state.lessonPlan = lessonPlan?.lessons || [];
   ensureVocabularySrsRecords();
   state.topic = topics()[0] || "";
   setupDeveloperTools();
@@ -66,6 +82,12 @@ async function fetchJson(url) {
   return response.json();
 }
 
+async function fetchOptionalJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  return response.json();
+}
+
 function bindEvents() {
   window.dutchTrainerActions = {
     startLesson: () => {
@@ -78,6 +100,10 @@ function bindEvents() {
     },
     practiceMistakes: () => {
       startLesson({ mistakesOnly: true });
+      render();
+    },
+    startVocabularyPractice: () => {
+      startLesson({ vocabularyOnly: true });
       render();
     },
     continueLesson,
@@ -102,6 +128,11 @@ function bindEvents() {
     state.progress.soundMuted = !state.progress.soundMuted;
     saveProgress();
     renderSoundButton();
+  });
+
+  els.learnerName.addEventListener("input", () => {
+    state.progress.learnerName = els.learnerName.value.trim();
+    saveProgress();
   });
 
   els.exerciseArea.addEventListener("click", (event) => {
@@ -142,17 +173,38 @@ function applySavedTheme() {
 }
 
 function render() {
+  renderContentMode();
   renderStats();
+  renderProfile();
   renderSoundButton();
   renderTopics();
+  renderLessonPath();
+  renderVocabularyPractice();
   renderLesson();
   renderDeveloperPanel();
+}
+
+function renderContentMode() {
+  if (!els.contentModeBadge) return;
+  els.contentModeBadge.textContent = CONTENT_MODE === "preview"
+    ? "Preview content • separate progress"
+    : "Live content";
 }
 
 function renderStats() {
   els.xp.textContent = state.progress.xp;
   els.streak.textContent = state.progress.streak;
   els.due.textContent = dueCount();
+}
+
+function renderProfile() {
+  if (document.activeElement !== els.learnerName) {
+    els.learnerName.value = state.progress.learnerName || "";
+  }
+  els.profileStreak.textContent = state.progress.streak;
+  els.profileXp.textContent = state.progress.xp;
+  els.profileWords.textContent = wordsLearnedCount();
+  els.profileDue.textContent = dueCount();
 }
 
 function renderSoundButton() {
@@ -186,6 +238,60 @@ function renderTopics() {
       state.topic = button.dataset.topic;
       state.lesson = null;
       state.feedback = "";
+      render();
+    });
+  });
+}
+
+function renderLessonPath() {
+  if (!els.lessonPath) return;
+  const lessons = state.lessonPlan.slice(0, 18);
+  els.pathCount.textContent = state.lessonPlan.length ? `${state.lessonPlan.length} lessons` : "Topic path";
+
+  if (!lessons.length) {
+    els.lessonPath.innerHTML = topics().slice(0, 10).map((topic, index) => `
+      <article class="path-node">
+        <span class="path-dot">${index + 1}</span>
+        <strong>${escapeHtml(topic)}</strong>
+        <span>Topic practice</span>
+      </article>
+    `).join("");
+    return;
+  }
+
+  els.lessonPath.innerHTML = lessons.map((lesson, index) => `
+    <article class="path-node">
+      <span class="path-dot">${index + 1}</span>
+      <strong>${escapeHtml(lesson.title)}</strong>
+      <span>${escapeHtml(lesson.cefrLevel)} • ${escapeHtml(lesson.estimatedMinutes)} • ${lesson.exerciseCount} exercises</span>
+    </article>
+  `).join("");
+}
+
+function renderVocabularyPractice() {
+  if (!els.vocabPractice) return;
+  const dueWords = state.words.filter((word) => isDue(word.id)).length;
+  const duomeWords = state.words.filter((word) => (word.sourceName || "").toLowerCase().includes("duome")).length;
+  const previewWords = state.words.slice(0, 12);
+  els.vocabCount.textContent = `${state.words.length} words`;
+  els.vocabPractice.innerHTML = `
+    <div class="today-rings">
+      <div><strong>${duomeWords}</strong><span>Duome words</span></div>
+      <div><strong>${dueWords}</strong><span>due now</span></div>
+      <div><strong>${wordsLearnedCount()}</strong><span>learned</span></div>
+    </div>
+    <div class="vocab-actions">
+      <button class="primary-button" type="button" data-vocab-action="review">Quick review</button>
+      <button class="secondary-button" type="button" data-vocab-action="weak">Weak words</button>
+    </div>
+    <div class="word-strip" aria-label="Vocabulary preview">
+      ${previewWords.map((word) => `<span class="word-chip">${escapeHtml(word.dutch)}</span>`).join("")}
+    </div>
+  `;
+
+  els.vocabPractice.querySelectorAll("[data-vocab-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      startLesson({ vocabularyOnly: true, mistakesOnly: button.dataset.vocabAction === "weak" });
       render();
     });
   });
@@ -404,7 +510,7 @@ function renderLessonStart() {
     <div class="lesson-card today-card">
       <p class="prompt-label">Today</p>
       <h3>Keep your Dutch moving</h3>
-      <p class="hint">Reviews come first, then new words, then extra practice for weak words.</p>
+      <p class="hint">Reviews come first, then new words, then extra practice for weak words. ${CONTENT_MODE === "preview" ? "Preview mode uses the staged v3 pack and Duome vocabulary." : ""}</p>
       <div class="today-rings">
         <div>
           <strong>${plan.newWords.length}</strong>
@@ -430,6 +536,7 @@ function renderLessonStart() {
       </div>
       ${lastAttempt ? `<p class="hint">Missed words from your last attempt will be prioritized next.</p>` : ""}
       <button id="startLesson" class="primary-button" type="button" data-action="start-lesson" onclick="window.dutchTrainerActions.startLesson()">Start lesson</button>
+      <button class="secondary-button" type="button" onclick="window.dutchTrainerActions.startVocabularyPractice()">Vocabulary warm-up</button>
     </div>
   `;
 }
@@ -439,12 +546,11 @@ function currentTask() {
 }
 
 function renderMultipleChoice(task) {
-  const item = task.item;
-  const choices = answerChoices(item);
+  const choices = answerChoices(task);
 
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
-    ${promptHtml(item, "Translate to English")}
+    ${promptHtml(taskPrompt(task), taskPromptLabel(task))}
     <div class="choice-grid">
       ${choices.map((choice) => `<button class="choice-button" type="button" data-answer="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join("")}
     </div>
@@ -457,10 +563,11 @@ function renderMultipleChoice(task) {
 }
 
 function renderTyped(task) {
+  const targetLanguage = task.direction === "en_to_nl" ? "Dutch" : "English";
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
-    ${promptHtml(task.item, "Type the English translation")}
-    <input id="answerInput" class="answer-input" autocomplete="off" autocapitalize="none" placeholder="English translation">
+    ${promptHtml(taskPrompt(task), `Type the ${targetLanguage} translation`)}
+    <input id="answerInput" class="answer-input" autocomplete="off" autocapitalize="none" placeholder="${targetLanguage} translation">
     <button id="checkTyped" class="primary-button" type="button" data-action="check-typed" onclick="window.dutchTrainerActions.checkTyped()">Check</button>
     ${feedbackHtml()}
   `;
@@ -565,7 +672,7 @@ function buildLessonPlan(options = {}) {
   const reviewIds = new Set(reviews.map((item) => item.id));
   const newWords = options.mistakesOnly
     ? []
-    : pickNewWords(reviewIds);
+    : pickNewWords(reviewIds, options);
   const usedIds = new Set([...reviewIds, ...newWords.map((word) => word.id)]);
   const weak = weakItems().filter((item) => !usedIds.has(item.id));
 
@@ -576,8 +683,11 @@ function buildLessonPlan(options = {}) {
   };
 }
 
-function pickNewWords(excludeIds = new Set()) {
+function pickNewWords(excludeIds = new Set(), options = {}) {
   const unseen = unseenWords().filter((word) => !excludeIds.has(word.id));
+  if (options.vocabularyOnly) {
+    return unseen.slice(0, NEW_WORD_TARGET);
+  }
   const preferred = unseen.filter((word) => word.topic === state.topic);
   return uniqueById([...preferred, ...unseen]).slice(0, NEW_WORD_TARGET);
 }
@@ -616,6 +726,7 @@ function buildTasks(items) {
       id: `task-${index}`,
       type: type === "matching" ? "multiple" : type,
       item,
+      direction: directionForItem(item, index),
       answered: false
     };
   });
@@ -632,9 +743,10 @@ function matchingItemsFor(primaryItem) {
 function answerTask(task, answer) {
   if (task.answered) return;
 
-  const correct = normalize(answer) === normalize(task.item.english);
+  const expected = taskAnswer(task);
+  const correct = normalize(answer) === normalize(expected);
   task.answered = true;
-  state.feedback = correct ? "Correct!" : `Answer: ${task.item.english}`;
+  state.feedback = correct ? "Correct!" : `Answer: ${expected}`;
   finishTask(task, correct, [task.item]);
   render();
 }
@@ -766,11 +878,11 @@ function lessonProgressHtml() {
   `;
 }
 
-function promptHtml(item, label) {
+function promptHtml(text, label) {
   return `
     <div class="prompt-card">
       <span class="prompt-label">${escapeHtml(label)}</span>
-      <strong class="prompt-text">${escapeHtml(item.dutch)}</strong>
+      <strong class="prompt-text">${escapeHtml(text)}</strong>
     </div>
   `;
 }
@@ -825,12 +937,14 @@ function nextReviewEstimate() {
   return `${days} days`;
 }
 
-function answerChoices(item) {
+function answerChoices(task) {
+  const item = task.item;
+  const expected = taskAnswer(task);
   const allAnswers = allPracticeItems()
-    .map((candidate) => candidate.english)
-    .filter((answer) => answer !== item.english);
+    .map((candidate) => answerForDirection(candidate, task.direction))
+    .filter((answer) => answer !== expected);
 
-  return shuffle([item.english, ...shuffle(allAnswers).slice(0, 3)]);
+  return shuffle([expected, ...shuffle([...new Set(allAnswers)]).slice(0, 3)]);
 }
 
 function updateSrs(item, correct) {
@@ -953,6 +1067,13 @@ function learnedCount(topic) {
   }).length;
 }
 
+function wordsLearnedCount() {
+  return state.words.filter((word) => {
+    const srs = state.progress.srs[word.id];
+    return srs && srs.totalCorrect > 0;
+  }).length;
+}
+
 function unseenWords() {
   return state.words
     .filter((word) => {
@@ -1020,8 +1141,39 @@ function taskLabel(type) {
   return "Word matching";
 }
 
+function directionForItem(item, index) {
+  const directions = Array.isArray(item.directions) && item.directions.length
+    ? item.directions
+    : ["nl_to_en"];
+
+  if (!directions.includes("en_to_nl")) return "nl_to_en";
+  if (!directions.includes("nl_to_en")) return "en_to_nl";
+  if (item.kind !== "sentence") return "nl_to_en";
+
+  const level = item.cefrLevel || "A1";
+  if (level === "B1") return index % 4 === 0 ? "nl_to_en" : "en_to_nl";
+  if (level === "A2") return index % 2 === 0 ? "nl_to_en" : "en_to_nl";
+  return index % 4 === 0 ? "en_to_nl" : "nl_to_en";
+}
+
+function taskPrompt(task) {
+  return task.direction === "en_to_nl" ? task.item.english : task.item.dutch;
+}
+
+function taskAnswer(task) {
+  return answerForDirection(task.item, task.direction);
+}
+
+function answerForDirection(item, direction) {
+  return direction === "en_to_nl" ? item.dutch : item.english;
+}
+
+function taskPromptLabel(task) {
+  return task.direction === "en_to_nl" ? "Translate to Dutch" : "Translate to English";
+}
+
 function loadProgress() {
-  const saved = localStorage.getItem("dutchTrainerProgress");
+  const saved = localStorage.getItem(PROGRESS_KEY);
   if (!saved) return defaultProgress();
 
   try {
@@ -1045,9 +1197,9 @@ function normalizeProgress(progress) {
 }
 
 function ensureVocabularySrsRecords() {
-  state.words.forEach((word) => {
-    if (!state.progress.srs[word.id]) {
-      state.progress.srs[word.id] = newSrsRecord(word.id);
+  allPracticeItems().forEach((item) => {
+    if (!state.progress.srs[item.id]) {
+      state.progress.srs[item.id] = newSrsRecord(item.id);
     }
   });
   saveProgress();
@@ -1055,6 +1207,7 @@ function ensureVocabularySrsRecords() {
 
 function defaultProgress() {
   return {
+    learnerName: "",
     xp: 0,
     streak: 0,
     lastPracticeDay: "",
@@ -1087,7 +1240,7 @@ function migrateCardsToSrs(cards) {
 }
 
 function saveProgress() {
-  localStorage.setItem("dutchTrainerProgress", JSON.stringify(state.progress));
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progress));
 }
 
 function dayKey(date) {

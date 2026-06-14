@@ -1,6 +1,6 @@
 # DutchTrainer
 
-DutchTrainer is a mobile-first Progressive Web App for English speakers learning Dutch at A0/A1 level.
+DutchTrainer is a mobile-first Progressive Web App for English speakers learning Dutch from beginner foundations toward B1.
 
 It works in iPhone Safari, can be added to the Home Screen, and supports offline use after the first visit.
 
@@ -11,6 +11,7 @@ It works in iPhone Safari, can be added to the Home Screen, and supports offline
 - Word matching
 - XP system
 - Daily streak
+- Local profile screen
 - Topic-based progress
 - SM-2-inspired spaced repetition
 - 20-exercise daily lessons
@@ -29,6 +30,13 @@ The app mixes three exercise types inside each lesson:
 - Multiple-choice translation
 - Typed translation
 - Word matching
+
+Sentence-pair translation exercises can run in both directions from the same Dutch-English content item:
+
+- Dutch to English: the learner sees Dutch and answers in English.
+- English to Dutch: the learner sees English and answers in Dutch.
+
+For source-backed Tatoeba content, the app keeps one bilingual sentence-pair record and uses `directions` plus level guidance to decide which direction to practice.
 
 When enough unseen words are available, a daily lesson introduces up to 20 new Dutch words. Lessons are built in this order:
 
@@ -69,6 +77,7 @@ New words begin as unseen. Correct answers increase repetitions and grow the int
 
 Progress saved locally includes:
 
+- Learner name
 - XP
 - Daily streak
 - Completed lessons
@@ -77,19 +86,91 @@ Progress saved locally includes:
 - Spaced-repetition item state
 - Sound mute/unmute setting
 
-## Content
+## Live Content
 
-The sample content lives in:
+Live app content lives in:
 
 ```text
 data/vocabulary.json
 data/sentences.json
+data/lesson-plan.json
+data/curriculum.json
 ```
 
-Included content:
+Current live private-app content:
 
-- 100 Dutch A1 vocabulary words
-- 50 beginner Dutch sentences
+- 2,547 vocabulary items
+- 3,100 bilingual Dutch-English sentence pairs
+- 155 structured lessons
+- 45 A1 lessons
+- 60 A2 lessons
+- 50 B1 lessons
+- 2,448 Duome-derived vocabulary items approved for this private two-person app
+
+The sentence pack uses curated source-backed Tatoeba Dutch-English pairs. Each sentence keeps both directions available through `directions: ["nl_to_en", "en_to_nl"]`.
+
+The vocabulary pack combines the original DutchTrainer seed vocabulary with Duome-derived vocabulary marked for this private app context. Duome vocabulary is used for vocabulary practice, matching, quick review, SRS review, and lesson reinforcement.
+
+`data/curriculum.json` is the curriculum map from A0 to B1.
+
+## Production Content Policy
+
+AI-generated or template-generated Dutch content is not production content. Generated content may only be used for app stress testing, importer validation, storage checks, and UI performance testing. It must not be used for learner-facing lessons.
+
+Production DutchTrainer content must come from reliable external sources with documented licensing and attribution. Production content should include these source metadata fields whenever available:
+
+- `sourceName`
+- `sourceUrl`
+- `sourceLicense`
+- `sourceAttribution`
+- `sourceId`
+
+Do not promote files from `tools/generated-output` into `data/`. Treat that folder as technical load-test output only.
+
+## Curriculum Map
+
+DutchTrainer uses `data/curriculum.json` as a planning structure for growing from first exposure to independent everyday communication.
+
+- `A0`: first survival Dutch. Learners focus on greetings, introductions, numbers, family, food, and very short memorized phrases.
+- `A1`: everyday basics. Learners build simple present-tense sentences for shopping, transport, housing, food, appointments, weather, and daily routines.
+- `A2`: everyday independence. Learners expand into work, study, services, health, opinions, past events, and future plans.
+- `B1`: confident everyday communication. Learners practice longer explanations, opinions with reasons, short stories, problem solving, culture, work, health, and public topics.
+
+Each level defines target vocabulary and sentence counts, grammar goals, practical topics, lesson groups, review ratio, estimated lesson count, and example lesson names. The review ratio should guide the lesson builder as content grows: lower levels introduce more new material, while higher levels reserve more space for SRS review and consolidation.
+
+The curriculum is intentionally separate from app progress. It is a content planning file, not a learner state file.
+
+## Content pipeline
+
+Content import tools live in `tools/`. They can import Dutch-English vocabulary from CSV or JSON and sentence pairs from CSV or TSV.
+
+For source-backed production content planning, start with:
+
+- `DATA_SOURCES.md` for approved source strategy, licensing notes, and manual download guidance
+- `tools/README.md` for exact importer, Tatoeba ingestion, and Wiktionary frequency commands
+
+Run the sample pipeline without replacing the current app data:
+
+```bash
+ruby tools/import_content.rb \
+  --vocab tools/sample-input/vocabulary.csv \
+  --vocab tools/sample-input/vocabulary.json \
+  --sentences tools/sample-input/sentences.tsv \
+  --output tools/sample-output
+```
+
+The pipeline:
+
+- Cleans malformed rows and duplicate Dutch prompts
+- Assigns IDs and normalizes fields
+- Assigns items to curriculum lesson groups from `data/curriculum.json`
+- Validates required fields and unique IDs
+- Writes app-ready `vocabulary.json` and `sentences.json`
+- Generates `content-report.md`
+
+The content report warns when lesson groups have too few words, CEFR levels are under-filled, topics have words but no sentences, or sentences are too long for their assigned level.
+
+Only validated and approved content should be written to `data/` for learner-facing lessons. Generated/template content must not be promoted to live app data.
 
 ## Run locally
 
@@ -178,8 +259,27 @@ If `index.html` is at the repository root, use the root folder. If you keep this
 The app uses relative paths, so it works on GitHub Pages project URLs like:
 
 ```text
-https://yourname.github.io/your-repo/
+https://archi0507.github.io/DutchTrainer/
 ```
+
+Current project URL:
+
+```text
+https://archi0507.github.io/DutchTrainer/
+```
+
+Preview URL:
+
+```text
+https://archi0507.github.io/DutchTrainer/?content=preview
+```
+
+After publishing an update, iPhone Safari or the Home Screen app may need one reload cycle to receive the new service worker cache:
+
+1. Open the site in Safari.
+2. Refresh once.
+3. If the Home Screen app still shows old content, close it fully and reopen it.
+4. If it is still stale, remove and re-add the Home Screen icon.
 
 ## Add more vocabulary
 
@@ -192,7 +292,12 @@ Edit `data/vocabulary.json` and add an item with a unique `id`:
   "english": "book",
   "topic": "Home",
   "exampleDutch": "Ik lees een boek.",
-  "exampleEnglish": "I read a book."
+  "exampleEnglish": "I read a book.",
+  "sourceName": "Source name",
+  "sourceUrl": "https://example.com/source",
+  "sourceLicense": "License name",
+  "sourceAttribution": "Attribution text",
+  "sourceId": "source-row-or-entry-id"
 }
 ```
 
@@ -207,7 +312,12 @@ Edit `data/sentences.json` and add an item with a unique `id`:
   "id": "sentence-051",
   "dutch": "Ik heb een boek.",
   "english": "I have a book.",
-  "topic": "Home"
+  "topic": "Home",
+  "sourceName": "Source name",
+  "sourceUrl": "https://example.com/source",
+  "sourceLicense": "License name",
+  "sourceAttribution": "Attribution text",
+  "sourceId": "source-row-or-entry-id"
 }
 ```
 
@@ -219,4 +329,56 @@ Progress is stored in the browser with `localStorage`. XP, streaks, completed le
 
 This means progress should still be there when the learner closes Safari or launches DutchTrainer again from the Home Screen. Progress can be removed if the learner clears Safari site data, uses private browsing, changes browser/device, or deletes the installed Home Screen app data.
 
+Progress is device-specific and browser-specific. Two people using different browsers, different devices, or different Safari profiles will have separate progress. The app does not write progress to shared files and does not sync progress between users. Cloud sync would need to be added later for cross-device accounts.
+
 During development, clear site data in the browser to reset XP, streaks, and spaced repetition.
+
+## Production content workflow
+
+Live app files in `data/` should only be updated after a staged content pack has passed validation and human review.
+
+The production content workflow is:
+
+```text
+raw source
+  -> source adapter
+  -> canonical staged output
+  -> schema validation
+  -> review queue
+  -> human approval
+  -> promotion validation
+  -> live data update
+```
+
+The canonical schema is documented in `docs/CONTENT_SCHEMA.md`.
+
+Useful checks:
+
+```sh
+ruby tools/validate_content_schema.rb --input tools/source-output/curated-pack-v1
+ruby tools/validate_promotion_ready.rb --input tools/source-output/curated-pack-v1
+```
+
+For this private two-person app, Duome-derived vocabulary is allowed in the `production-private` lane. It must keep source metadata and should not be treated as generally publishable open content.
+
+AI-generated or template-generated Dutch content is not production learning content. Generated content may only be used for stress testing and tooling checks. Production content must preserve source metadata, licensing, attribution, source IDs where available, and an explicit content lane.
+
+## Preview content mode
+
+Staged content can be tested without replacing live app data:
+
+```text
+?content=preview
+```
+
+Preview mode loads `data-preview/` and stores progress separately under `dutchTrainerProgressPreview`, so normal local progress remains separate.
+
+## Rollback
+
+Before live promotion, timestamped backups are written under:
+
+```text
+tools/backups/
+```
+
+To roll back a promotion, copy the backed-up files from the relevant timestamped folder back to their original paths, then bump the service worker cache version in `sw.js` so installed PWAs fetch the restored files.
