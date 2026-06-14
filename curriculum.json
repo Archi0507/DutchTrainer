@@ -1,0 +1,410 @@
+{
+  "schemaVersion": 1,
+  "description": "DutchTrainer curriculum structure from A0 to B1. This file is a planning map and does not replace current app content.",
+  "levels": [
+    {
+      "level": "A0",
+      "title": "First Dutch Survival",
+      "targetVocabularyCount": 150,
+      "targetSentenceCount": 80,
+      "reviewRatio": 0.35,
+      "estimatedLessonCount": 12,
+      "grammarGoals": [
+        "Recognize Dutch sounds and common spelling patterns",
+        "Use basic pronouns: ik, jij, hij, zij, wij",
+        "Understand simple word order in short statements",
+        "Use zijn and hebben in memorized phrases",
+        "Recognize de and het as noun markers",
+        "Ask and answer very short yes/no questions"
+      ],
+      "topics": [
+        "greetings",
+        "introductions",
+        "numbers",
+        "days and time",
+        "family",
+        "food and drinks",
+        "classroom phrases",
+        "basic places"
+      ],
+      "lessonGroups": [
+        {
+          "id": "a0-greetings",
+          "name": "greetings",
+          "goal": "Say hello, goodbye, please, thank you, and introduce yourself.",
+          "targetVocabularyCount": 25,
+          "targetSentenceCount": 12,
+          "exampleLessonNames": [
+            "Hello and Goodbye",
+            "My Name Is...",
+            "Please and Thank You"
+          ]
+        },
+        {
+          "id": "a0-numbers-time",
+          "name": "numbers",
+          "goal": "Use numbers 0-20 and recognize simple time words.",
+          "targetVocabularyCount": 35,
+          "targetSentenceCount": 15,
+          "exampleLessonNames": [
+            "Numbers 0-10",
+            "Numbers 11-20",
+            "Today and Tomorrow"
+          ]
+        },
+        {
+          "id": "a0-family-food",
+          "name": "family and food",
+          "goal": "Name close family members and order very simple food or drinks.",
+          "targetVocabularyCount": 45,
+          "targetSentenceCount": 25,
+          "exampleLessonNames": [
+            "My Family",
+            "Coffee or Tea",
+            "I Would Like..."
+          ]
+        },
+        {
+          "id": "a0-places",
+          "name": "basic places",
+          "goal": "Recognize common places and ask where something is.",
+          "targetVocabularyCount": 45,
+          "targetSentenceCount": 28,
+          "exampleLessonNames": [
+            "At Home",
+            "In the City",
+            "Where Is It?"
+          ]
+        }
+      ],
+      "exampleLessonNames": [
+        "Hello, I Am...",
+        "Numbers and Names",
+        "Coffee, Water, Bread",
+        "Where Is the Station?"
+      ]
+    },
+    {
+      "level": "A1",
+      "title": "Everyday Basics",
+      "targetVocabularyCount": 650,
+      "targetSentenceCount": 350,
+      "reviewRatio": 0.4,
+      "estimatedLessonCount": 45,
+      "grammarGoals": [
+        "Use present tense regular verbs",
+        "Use common irregular verbs: zijn, hebben, gaan, kunnen, willen",
+        "Build simple main clauses with subject-verb order",
+        "Ask wh-questions with wie, wat, waar, wanneer, hoe",
+        "Use negation with niet and geen",
+        "Use basic plural forms",
+        "Use possessives: mijn, jouw, zijn, haar, onze",
+        "Use simple prepositions of place"
+      ],
+      "topics": [
+        "greetings",
+        "numbers",
+        "family",
+        "food",
+        "shopping",
+        "transport",
+        "housing",
+        "weather",
+        "daily routine",
+        "appointments"
+      ],
+      "lessonGroups": [
+        {
+          "id": "a1-family-routine",
+          "name": "family and daily routine",
+          "goal": "Talk about people, routines, and simple daily activities.",
+          "targetVocabularyCount": 120,
+          "targetSentenceCount": 70,
+          "exampleLessonNames": [
+            "My Family",
+            "Every Morning",
+            "At School or Work"
+          ]
+        },
+        {
+          "id": "a1-food-shopping",
+          "name": "food and shopping",
+          "goal": "Buy basic items, ask prices, and describe simple preferences.",
+          "targetVocabularyCount": 150,
+          "targetSentenceCount": 90,
+          "exampleLessonNames": [
+            "At the Supermarket",
+            "How Much Is It?",
+            "I Like Cheese"
+          ]
+        },
+        {
+          "id": "a1-transport-city",
+          "name": "transport and city",
+          "goal": "Use simple travel phrases and ask for directions.",
+          "targetVocabularyCount": 140,
+          "targetSentenceCount": 80,
+          "exampleLessonNames": [
+            "The Bus Is Late",
+            "At the Station",
+            "Turn Left"
+          ]
+        },
+        {
+          "id": "a1-housing-appointments",
+          "name": "housing and appointments",
+          "goal": "Describe a home, make simple plans, and confirm times.",
+          "targetVocabularyCount": 140,
+          "targetSentenceCount": 70,
+          "exampleLessonNames": [
+            "My Room",
+            "The Appointment Is Tomorrow",
+            "Can You Come?"
+          ]
+        },
+        {
+          "id": "a1-health-weather",
+          "name": "health and weather",
+          "goal": "Describe basic feelings, simple symptoms, and weather.",
+          "targetVocabularyCount": 100,
+          "targetSentenceCount": 40,
+          "exampleLessonNames": [
+            "I Am Tired",
+            "It Is Cold Today",
+            "At the Doctor"
+          ]
+        }
+      ],
+      "exampleLessonNames": [
+        "At the Market",
+        "My House",
+        "The Train Comes Now",
+        "I Have an Appointment"
+      ]
+    },
+    {
+      "level": "A2",
+      "title": "Everyday Independence",
+      "targetVocabularyCount": 1400,
+      "targetSentenceCount": 900,
+      "reviewRatio": 0.45,
+      "estimatedLessonCount": 75,
+      "grammarGoals": [
+        "Use separable verbs in common contexts",
+        "Use perfect tense for common past events",
+        "Use modal verbs with infinitives",
+        "Use want, omdat, maar, and en to connect ideas",
+        "Use comparative and superlative adjectives",
+        "Use object pronouns in simple sentences",
+        "Use time expressions for recent past and near future",
+        "Understand common word order changes after conjunctions"
+      ],
+      "topics": [
+        "work",
+        "education",
+        "health",
+        "appointments",
+        "shopping",
+        "transport",
+        "housing",
+        "past events",
+        "future plans",
+        "opinions",
+        "travel",
+        "services"
+      ],
+      "lessonGroups": [
+        {
+          "id": "a2-work-study",
+          "name": "work and study",
+          "goal": "Talk about jobs, school, schedules, and simple responsibilities.",
+          "targetVocabularyCount": 220,
+          "targetSentenceCount": 150,
+          "exampleLessonNames": [
+            "My Job",
+            "A Busy Week",
+            "I Have to Study"
+          ]
+        },
+        {
+          "id": "a2-health-services",
+          "name": "health and services",
+          "goal": "Explain simple problems and handle everyday service situations.",
+          "targetVocabularyCount": 230,
+          "targetSentenceCount": 160,
+          "exampleLessonNames": [
+            "I Have a Headache",
+            "At the Pharmacy",
+            "Calling Customer Service"
+          ]
+        },
+        {
+          "id": "a2-past-events",
+          "name": "past events",
+          "goal": "Describe what happened using common perfect tense patterns.",
+          "targetVocabularyCount": 260,
+          "targetSentenceCount": 180,
+          "exampleLessonNames": [
+            "Yesterday I Worked",
+            "We Went to the City",
+            "What Happened?"
+          ]
+        },
+        {
+          "id": "a2-future-plans",
+          "name": "future plans",
+          "goal": "Make plans, talk about intentions, and arrange times.",
+          "targetVocabularyCount": 220,
+          "targetSentenceCount": 150,
+          "exampleLessonNames": [
+            "This Weekend",
+            "I Am Going to Travel",
+            "Let's Meet at Seven"
+          ]
+        },
+        {
+          "id": "a2-opinions",
+          "name": "opinions",
+          "goal": "Give simple opinions and reasons about familiar topics.",
+          "targetVocabularyCount": 240,
+          "targetSentenceCount": 160,
+          "exampleLessonNames": [
+            "I Think It Is Good",
+            "Because It Is Easy",
+            "Better or Cheaper"
+          ]
+        },
+        {
+          "id": "a2-travel-housing",
+          "name": "travel and housing",
+          "goal": "Handle travel, rental, and neighborhood conversations.",
+          "targetVocabularyCount": 230,
+          "targetSentenceCount": 100,
+          "exampleLessonNames": [
+            "Booking a Room",
+            "The Rent Is High",
+            "A Trip to Belgium"
+          ]
+        }
+      ],
+      "exampleLessonNames": [
+        "I Worked Yesterday",
+        "At the Pharmacy",
+        "I Think It Is Too Expensive",
+        "Plans for the Weekend"
+      ]
+    },
+    {
+      "level": "B1",
+      "title": "Confident Everyday Communication",
+      "targetVocabularyCount": 2600,
+      "targetSentenceCount": 1800,
+      "reviewRatio": 0.5,
+      "estimatedLessonCount": 110,
+      "grammarGoals": [
+        "Use subordinate clauses with correct verb placement",
+        "Use past tense and perfect tense in familiar narratives",
+        "Use future constructions with gaan and zullen",
+        "Use relative clauses with die and dat",
+        "Use reflexive verbs in daily contexts",
+        "Use common passive-like constructions and impersonal phrases",
+        "Use opinion structures with reasons and examples",
+        "Understand common idiomatic phrases in everyday speech"
+      ],
+      "topics": [
+        "work",
+        "education",
+        "health",
+        "appointments",
+        "housing",
+        "opinions",
+        "past events",
+        "future plans",
+        "news and society",
+        "culture",
+        "relationships",
+        "problem solving"
+      ],
+      "lessonGroups": [
+        {
+          "id": "b1-work-education",
+          "name": "work and education",
+          "goal": "Discuss experience, goals, problems, and preferences at work or school.",
+          "targetVocabularyCount": 420,
+          "targetSentenceCount": 300,
+          "exampleLessonNames": [
+            "My Work Experience",
+            "A Problem at Work",
+            "Choosing a Course"
+          ]
+        },
+        {
+          "id": "b1-health-appointments",
+          "name": "health and appointments",
+          "goal": "Explain symptoms, follow advice, and manage appointments in detail.",
+          "targetVocabularyCount": 360,
+          "targetSentenceCount": 250,
+          "exampleLessonNames": [
+            "Explaining Symptoms",
+            "Changing an Appointment",
+            "Healthy Habits"
+          ]
+        },
+        {
+          "id": "b1-opinions-reasons",
+          "name": "opinions and reasons",
+          "goal": "Express opinions clearly and support them with reasons and examples.",
+          "targetVocabularyCount": 430,
+          "targetSentenceCount": 330,
+          "exampleLessonNames": [
+            "I Agree Because...",
+            "Pros and Cons",
+            "What Would You Choose?"
+          ]
+        },
+        {
+          "id": "b1-past-future",
+          "name": "past events and future plans",
+          "goal": "Tell short stories and discuss future plans with context.",
+          "targetVocabularyCount": 460,
+          "targetSentenceCount": 330,
+          "exampleLessonNames": [
+            "A Weekend Story",
+            "What I Used to Do",
+            "Plans for Next Year"
+          ]
+        },
+        {
+          "id": "b1-society-culture",
+          "name": "news, society, and culture",
+          "goal": "Understand and discuss simple news, cultural habits, and public topics.",
+          "targetVocabularyCount": 480,
+          "targetSentenceCount": 340,
+          "exampleLessonNames": [
+            "Reading Simple News",
+            "Dutch Traditions",
+            "Public Transport Debate"
+          ]
+        },
+        {
+          "id": "b1-problem-solving",
+          "name": "problem solving",
+          "goal": "Describe issues, negotiate solutions, and explain what needs to happen.",
+          "targetVocabularyCount": 450,
+          "targetSentenceCount": 250,
+          "exampleLessonNames": [
+            "The Package Did Not Arrive",
+            "Finding a Solution",
+            "Could You Help Me?"
+          ]
+        }
+      ],
+      "exampleLessonNames": [
+        "Changing an Appointment",
+        "A Story About Last Weekend",
+        "I Agree Because...",
+        "Solving a Housing Problem"
+      ]
+    }
+  ]
+}
