@@ -1,0 +1,48 @@
+{
+  "version": "2.0-groundwork",
+  "notes": "Internal preparation for future V2.1 level sequencing. Not fully exposed in the UI yet.",
+  "levels": [
+    {
+      "id": "A0",
+      "label": "First Dutch",
+      "parentLevel": "A0",
+      "order": 0
+    },
+    {
+      "id": "A1.1",
+      "label": "A1 Foundations",
+      "parentLevel": "A1",
+      "order": 1
+    },
+    {
+      "id": "A1.2",
+      "label": "A1 Everyday Basics",
+      "parentLevel": "A1",
+      "order": 2
+    },
+    {
+      "id": "A2.1",
+      "label": "A2 Daily Independence",
+      "parentLevel": "A2",
+      "order": 3
+    },
+    {
+      "id": "A2.2",
+      "label": "A2 Services and Plans",
+      "parentLevel": "A2",
+      "order": 4
+    },
+    {
+      "id": "B1.1",
+      "label": "B1 Practical Communication",
+      "parentLevel": "B1",
+      "order": 5
+    },
+    {
+      "id": "B1.2",
+      "label": "B1 Reasons and Problems",
+      "parentLevel": "B1",
+      "order": 6
+    }
+  ]
+}

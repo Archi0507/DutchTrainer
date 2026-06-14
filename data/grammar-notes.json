@@ -1,0 +1,249 @@
+[
+  {
+    "id": "a1-de-het",
+    "title": "de vs het",
+    "level": "A1",
+    "explanation": "Most Dutch nouns use de. Some common nouns use het. Learn the article together with the noun: de tafel, het huis.",
+    "examples": [
+      {
+        "dutch": "de tafel",
+        "english": "the table"
+      },
+      {
+        "dutch": "het huis",
+        "english": "the house"
+      }
+    ],
+    "linkedTopics": [
+      "Home",
+      "family and daily routine",
+      "housing and appointments",
+      "greetings and basics"
+    ],
+    "linkedLessonGroups": [
+      "a1-family-routine",
+      "a1-housing-appointments"
+    ]
+  },
+  {
+    "id": "a1-basic-word-order",
+    "title": "basic sentence order",
+    "level": "A1",
+    "explanation": "A simple Dutch sentence often follows subject, verb, rest: ik drink water. The verb usually comes second.",
+    "examples": [
+      {
+        "dutch": "Ik drink water.",
+        "english": "I drink water."
+      },
+      {
+        "dutch": "Wij gaan naar huis.",
+        "english": "We are going home."
+      }
+    ],
+    "linkedTopics": [
+      "family and daily routine",
+      "food and shopping",
+      "transport and city"
+    ],
+    "linkedLessonGroups": [
+      "a1-family-routine",
+      "a1-food-shopping",
+      "a1-transport-city"
+    ]
+  },
+  {
+    "id": "a1-present-tense-basics",
+    "title": "present tense basics",
+    "level": "A1",
+    "explanation": "In the present tense, ik often uses the short verb form: ik woon, ik drink. With jij, hij, zij, and het, Dutch often adds -t.",
+    "examples": [
+      {
+        "dutch": "Ik woon hier.",
+        "english": "I live here."
+      },
+      {
+        "dutch": "Hij werkt vandaag.",
+        "english": "He works today."
+      }
+    ],
+    "linkedTopics": [
+      "work and study",
+      "family and daily routine"
+    ],
+    "linkedLessonGroups": [
+      "a1-family-routine",
+      "a2-work-study"
+    ]
+  },
+  {
+    "id": "a1-question-words",
+    "title": "question words",
+    "level": "A1",
+    "explanation": "Useful Dutch question words include wie, wat, waar, wanneer, waarom, and hoe. Put the verb right after the question word.",
+    "examples": [
+      {
+        "dutch": "Waar woon je?",
+        "english": "Where do you live?"
+      },
+      {
+        "dutch": "Hoe gaat het?",
+        "english": "How are you?"
+      }
+    ],
+    "linkedTopics": [
+      "greetings and basics",
+      "housing and appointments"
+    ],
+    "linkedLessonGroups": [
+      "a0-greetings",
+      "a1-housing-appointments"
+    ]
+  },
+  {
+    "id": "a2-modal-verbs",
+    "title": "modal verbs",
+    "level": "A2",
+    "explanation": "Modal verbs like kunnen, moeten, mogen, willen, and zullen help you say what you can, must, may, want, or will do. The main verb often moves to the end.",
+    "examples": [
+      {
+        "dutch": "Ik moet werken.",
+        "english": "I have to work."
+      },
+      {
+        "dutch": "Wij kunnen morgen komen.",
+        "english": "We can come tomorrow."
+      }
+    ],
+    "linkedTopics": [
+      "future plans",
+      "work and study",
+      "appointments"
+    ],
+    "linkedLessonGroups": [
+      "a2-future-plans",
+      "a2-work-study"
+    ]
+  },
+  {
+    "id": "a2-past-tense",
+    "title": "past tense",
+    "level": "A2",
+    "explanation": "Dutch often uses hebben or zijn plus a past participle to talk about past events: ik heb gewerkt, ik ben gegaan.",
+    "examples": [
+      {
+        "dutch": "Ik heb gisteren gewerkt.",
+        "english": "I worked yesterday."
+      },
+      {
+        "dutch": "Wij zijn naar huis gegaan.",
+        "english": "We went home."
+      }
+    ],
+    "linkedTopics": [
+      "past events",
+      "work and study"
+    ],
+    "linkedLessonGroups": [
+      "a2-past-events",
+      "a2-work-study"
+    ]
+  },
+  {
+    "id": "a2-adjective-endings",
+    "title": "adjective endings",
+    "level": "A2",
+    "explanation": "Adjectives often get -e before a noun: een grote tafel, de rode auto. Some het-words after een keep the short form.",
+    "examples": [
+      {
+        "dutch": "de rode auto",
+        "english": "the red car"
+      },
+      {
+        "dutch": "een klein huis",
+        "english": "a small house"
+      }
+    ],
+    "linkedTopics": [
+      "housing and appointments",
+      "food and shopping"
+    ],
+    "linkedLessonGroups": [
+      "a1-housing-appointments",
+      "a1-food-shopping"
+    ]
+  },
+  {
+    "id": "b1-separable-verbs",
+    "title": "separable verbs",
+    "level": "B1",
+    "explanation": "Some Dutch verbs split in simple sentences: opbellen becomes ik bel je op. In other forms, the parts can come back together.",
+    "examples": [
+      {
+        "dutch": "Ik bel je later op.",
+        "english": "I will call you later."
+      },
+      {
+        "dutch": "Wij komen morgen terug.",
+        "english": "We are coming back tomorrow."
+      }
+    ],
+    "linkedTopics": [
+      "work and education",
+      "appointments",
+      "problem solving"
+    ],
+    "linkedLessonGroups": [
+      "b1-work-education",
+      "b1-problem-solving"
+    ]
+  },
+  {
+    "id": "b1-subordinate-clauses",
+    "title": "subordinate clauses",
+    "level": "B1",
+    "explanation": "After words like omdat, dat, and als, the verb often moves toward the end of the clause.",
+    "examples": [
+      {
+        "dutch": "Ik blijf thuis omdat ik ziek ben.",
+        "english": "I am staying home because I am sick."
+      },
+      {
+        "dutch": "Als ik tijd heb, kom ik langs.",
+        "english": "If I have time, I will come by."
+      }
+    ],
+    "linkedTopics": [
+      "opinions and reasons",
+      "health and appointments"
+    ],
+    "linkedLessonGroups": [
+      "b1-opinions-reasons",
+      "b1-health-appointments"
+    ]
+  },
+  {
+    "id": "b1-word-order-variations",
+    "title": "word-order variations",
+    "level": "B1",
+    "explanation": "Dutch can start with time, place, or another idea for emphasis. The verb still usually comes second: morgen ga ik werken.",
+    "examples": [
+      {
+        "dutch": "Morgen ga ik werken.",
+        "english": "Tomorrow I am going to work."
+      },
+      {
+        "dutch": "In de stad koop ik brood.",
+        "english": "In the city I buy bread."
+      }
+    ],
+    "linkedTopics": [
+      "future plans",
+      "work and education",
+      "daily-life situations"
+    ],
+    "linkedLessonGroups": [
+      "b1-past-future",
+      "b1-work-education"
+    ]
+  }
+]
