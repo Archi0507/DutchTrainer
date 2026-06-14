@@ -82,6 +82,13 @@ const feedbackDiagnostics = {
   lastHapticStatus: "none",
   lastAnswerCheckResult: "none",
   lastAnswerCheckTriggeredFeedback: false,
+  lastTapAt: "never",
+  lastVisualFeedbackAt: "never",
+  lastVisualFeedbackDelayMs: "n/a",
+  lastTranslationDisplayItem: "none",
+  lastCorrectSoundAt: "never",
+  lastWrongSoundAt: "never",
+  lastCompletionSoundAt: "never",
   correctSoundCalls: 0,
   wrongSoundCalls: 0,
   completionSoundCalls: 0,
@@ -160,9 +167,9 @@ function bindEvents() {
     },
     speakDutch: (text) => pronounceDutch(text, { source: "tap" }),
     continueLesson,
-    checkTyped: async () => {
+    checkTyped: () => {
       const input = document.querySelector("#answerInput");
-      await answerTask(currentTask(), input?.value || "");
+      answerTask(currentTask(), input?.value || "");
     }
   };
 
@@ -479,6 +486,9 @@ function renderDeveloperPanel() {
       <button type="button" data-dev-action="simulate-correct-feedback">Simulate Correct Answer Feedback</button>
       <button type="button" data-dev-action="simulate-wrong-feedback">Simulate Wrong Answer Feedback</button>
       <button type="button" data-dev-action="simulate-completion-feedback">Simulate Completion Feedback</button>
+      <button type="button" data-dev-action="simulate-correct-answer">Simulate Correct Answer</button>
+      <button type="button" data-dev-action="simulate-wrong-answer">Simulate Wrong Answer</button>
+      <button type="button" data-dev-action="test-translation-display">Test Translation Display: Hallo, Hoe gaat het?</button>
       <button type="button" data-dev-action="test-word">Test Dutch Word</button>
       <button type="button" data-dev-action="test-sentence">Test Dutch Sentence</button>
     </div>
@@ -515,13 +525,20 @@ function renderDeveloperPanel() {
         <div><dt>Audio unlocked</dt><dd>${audioUnlocked ? "yes" : "no"}</dd></div>
         <div><dt>Haptics supported</dt><dd>${hapticsSupported() ? "yes" : "no"}</dd></div>
         <div><dt>Last feedback type attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastType)}</dd></div>
+        <div><dt>Last correct sound attempt</dt><dd>${escapeHtml(feedbackDiagnostics.lastCorrectSoundAt)}</dd></div>
+        <div><dt>Last wrong sound attempt</dt><dd>${escapeHtml(feedbackDiagnostics.lastWrongSoundAt)}</dd></div>
+        <div><dt>Last completion sound attempt</dt><dd>${escapeHtml(feedbackDiagnostics.lastCompletionSoundAt)}</dd></div>
         <div><dt>Last feedback sound attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastSoundAt)}</dd></div>
         <div><dt>Last feedback sound success/failure</dt><dd>${escapeHtml(feedbackDiagnostics.lastSoundStatus)}</dd></div>
         <div><dt>Last feedback sound error</dt><dd>${escapeHtml(feedbackDiagnostics.lastError)}</dd></div>
         <div><dt>Last haptic attempted</dt><dd>${escapeHtml(feedbackDiagnostics.lastHapticAt)}</dd></div>
         <div><dt>Last haptic success/failure/unsupported</dt><dd>${escapeHtml(feedbackDiagnostics.lastHapticStatus)}</dd></div>
         <div><dt>Last answer-check result</dt><dd>${escapeHtml(feedbackDiagnostics.lastAnswerCheckResult)}</dd></div>
+        <div><dt>Timestamp when user tapped</dt><dd>${escapeHtml(feedbackDiagnostics.lastTapAt)}</dd></div>
+        <div><dt>Timestamp when visual feedback rendered</dt><dd>${escapeHtml(feedbackDiagnostics.lastVisualFeedbackAt)}</dd></div>
+        <div><dt>Visual feedback delay</dt><dd>${escapeHtml(String(feedbackDiagnostics.lastVisualFeedbackDelayMs))} ms</dd></div>
         <div><dt>Last answer-check triggered feedback</dt><dd>${feedbackDiagnostics.lastAnswerCheckTriggeredFeedback ? "yes" : "no"}</dd></div>
+        <div><dt>Last translation display item tested</dt><dd>${escapeHtml(feedbackDiagnostics.lastTranslationDisplayItem)}</dd></div>
         <div><dt>Correct sound calls</dt><dd>${feedbackDiagnostics.correctSoundCalls}</dd></div>
         <div><dt>Wrong sound calls</dt><dd>${feedbackDiagnostics.wrongSoundCalls}</dd></div>
         <div><dt>Completion sound calls</dt><dd>${feedbackDiagnostics.completionSoundCalls}</dd></div>
@@ -578,9 +595,12 @@ function renderDeveloperPanel() {
       if (action === "test-haptic-correct") triggerCorrectHaptic();
       if (action === "test-haptic-wrong") triggerWrongHaptic();
       if (action === "test-haptic-completion") triggerCompletionHaptic();
-      if (action === "simulate-correct-feedback") handleFeedback("correct");
-      if (action === "simulate-wrong-feedback") handleFeedback("wrong");
-      if (action === "simulate-completion-feedback") handleFeedback("completion");
+      if (action === "simulate-correct-feedback") triggerFeedbackEffects("correct", { source: "diagnostic" });
+      if (action === "simulate-wrong-feedback") triggerFeedbackEffects("wrong", { source: "diagnostic" });
+      if (action === "simulate-completion-feedback") triggerFeedbackEffects("completion", { source: "diagnostic" });
+      if (action === "simulate-correct-answer") simulateAnswerFeedback(true);
+      if (action === "simulate-wrong-answer") simulateAnswerFeedback(false);
+      if (action === "test-translation-display") testTranslationDisplayDiagnostic();
       if (action === "test-word") pronounceDutch("de tafel", { source: "diagnostic word" });
       if (action === "test-sentence") pronounceDutch("Ik leer Nederlands.", { source: "diagnostic sentence" });
       render();
@@ -764,7 +784,7 @@ function renderMultipleChoice(task) {
   `;
 
   els.exerciseArea.querySelectorAll(".choice-button").forEach((button) => {
-    button.addEventListener("click", async () => answerTask(task, button.dataset.answer));
+    button.addEventListener("click", () => answerTask(task, button.dataset.answer));
   });
 }
 
@@ -780,8 +800,8 @@ function renderTyped(task) {
   `;
 
   const input = document.querySelector("#answerInput");
-  input.addEventListener("keydown", async (event) => {
-    if (event.key === "Enter") await answerTask(task, input.value);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") answerTask(task, input.value);
   });
   if (!task.answered) input.focus();
 }
@@ -807,14 +827,13 @@ function renderMatching(task) {
   `;
 
   els.exerciseArea.querySelectorAll(".match-button").forEach((button) => {
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", () => {
       if (task.answered) return;
       if (button.dataset.side === "dutch") {
         state.selectedDutchId = button.dataset.value;
       }
       if (button.dataset.side === "english") state.selectedEnglish = button.dataset.value;
-      await tryMatch(task);
-      render();
+      tryMatch(task);
     });
   });
 }
@@ -980,41 +999,84 @@ function matchingItemsFor(primaryItem) {
   return uniqueById([primaryWord, ...shuffle(candidates)]).slice(0, 3);
 }
 
-async function answerTask(task, answer) {
+function markAnswerTap() {
+  const now = performance.now();
+  feedbackDiagnostics.lastTapAt = timestampLabel();
+  feedbackDiagnostics.lastVisualFeedbackAt = "pending";
+  feedbackDiagnostics.lastVisualFeedbackDelayMs = "pending";
+  return now;
+}
+
+function recordVisualFeedbackRendered(startedAt) {
+  const delay = Math.max(0, Math.round(performance.now() - startedAt));
+  feedbackDiagnostics.lastVisualFeedbackAt = timestampLabel();
+  feedbackDiagnostics.lastVisualFeedbackDelayMs = delay;
+  renderDeveloperPanel();
+}
+
+function simulateAnswerFeedback(correct) {
+  const startedAt = markAnswerTap();
+  recordAnswerCheckResult(correct);
+  state.feedback = correct ? "Correct!" : "Answer: Hello, how are you?";
+  render();
+  recordVisualFeedbackRendered(startedAt);
+  triggerFeedbackEffects(correct ? "correct" : "wrong", { source: "answer-check" });
+}
+
+function testTranslationDisplayDiagnostic() {
+  const item = {
+    id: "diagnostic-hallo-hoe-gaat-het",
+    kind: "sentence",
+    type: "sentence",
+    dutch: "Hallo, Hoe gaat het?",
+    english: "Hello, how are you?"
+  };
+  const display = getDisplayAnswer(item, "nl_to_en");
+  const accepted = getAcceptedAnswers(item);
+  feedbackDiagnostics.lastTranslationDisplayItem = `${item.dutch} -> ${display} | accepted: ${accepted.join(" / ")}`;
+  renderDeveloperPanel();
+}
+
+function answerTask(task, answer) {
   if (task.answered) return;
 
-  await unlockAudio();
+  const tappedAt = markAnswerTap();
   const expected = taskAnswer(task);
   const correct = isAnswerCorrect(answer, task.item, task.direction);
   task.answered = true;
   state.feedback = correct ? "Correct!" : `Answer: ${expected}`;
   recordAnswerCheckResult(correct);
-  if (task.direction === "en_to_nl" && correct) {
-    pronounceDutch(answer, { source: "selected answer" });
-  }
-  if (!correct) pronounceDutchAnswer(task, expected);
-  await finishTask(task, correct, [task.item]);
+  finishTask(task, correct, [task.item]);
   render();
+  recordVisualFeedbackRendered(tappedAt);
+  triggerFeedbackEffects(correct ? "correct" : "wrong", { source: "answer-check" });
+  if (task.direction === "en_to_nl" && correct) {
+    queueMicrotask(() => pronounceDutch(answer, { source: "selected answer" }));
+  }
+  if (!correct) queueMicrotask(() => pronounceDutchAnswer(task, expected));
 }
 
-async function tryMatch(task) {
-  if (!state.selectedDutchId || !state.selectedEnglish) return;
+function tryMatch(task) {
+  if (!state.selectedDutchId || !state.selectedEnglish) {
+    render();
+    return;
+  }
 
-  await unlockAudio();
+  const tappedAt = markAnswerTap();
   const item = task.items.find((candidate) => candidate.id === state.selectedDutchId);
   const correct = item && item.english === state.selectedEnglish;
+  let feedbackType = "";
 
   if (correct) {
     task.matchedIds.push(item.id);
     state.feedback = "Correct!";
     recordAnswerCheckResult(true);
-    await handleFeedback("correct", { source: "answer-check" });
+    feedbackType = "correct";
   } else if (item) {
     task.hadMistake = true;
     state.feedback = `Answer: ${displayDutch(item)} = ${item.english}`;
-    pronounceDutch(pronunciationText(item), { source: "answer reveal" });
     recordAnswerCheckResult(false);
-    await handleFeedback("wrong", { source: "answer-check" });
+    feedbackType = "wrong";
   }
 
   state.selectedDutchId = "";
@@ -1022,11 +1084,15 @@ async function tryMatch(task) {
 
   if (task.matchedIds.length === task.items.length) {
     task.answered = true;
-    await finishTask(task, !task.hadMistake, task.items, { soundAlreadyPlayed: true });
+    finishTask(task, !task.hadMistake, task.items, { soundAlreadyPlayed: true });
   }
+  render();
+  recordVisualFeedbackRendered(tappedAt);
+  if (feedbackType) triggerFeedbackEffects(feedbackType, { source: "answer-check" });
+  if (item && feedbackType === "wrong") queueMicrotask(() => pronounceDutch(pronunciationText(item), { source: "answer reveal" }));
 }
 
-async function finishTask(task, correct, items, options = {}) {
+function finishTask(task, correct, items, options = {}) {
   if (state.lesson.answeredTaskIds.includes(task.id)) return;
 
   updateStreak();
@@ -1045,9 +1111,6 @@ async function finishTask(task, correct, items, options = {}) {
     }
   });
 
-  if (!options.soundAlreadyPlayed) {
-    await handleFeedback(correct ? "correct" : "wrong", { source: "answer-check" });
-  }
   saveProgress();
   renderStats();
 }
@@ -1058,7 +1121,7 @@ function addIncorrectId(id) {
   }
 }
 
-async function continueLesson() {
+function continueLesson() {
   if (!state.lesson) return;
 
   state.feedback = "";
@@ -1066,7 +1129,7 @@ async function continueLesson() {
   state.selectedEnglish = "";
 
   if (state.lesson.index + 1 >= LESSON_SIZE) {
-    await completeLesson();
+    completeLesson();
   } else {
     state.lesson.index += 1;
   }
@@ -1075,7 +1138,7 @@ async function continueLesson() {
   render();
 }
 
-async function completeLesson() {
+function completeLesson() {
   const passed = state.lesson.correct >= PASSING_SCORE;
   const xpEarned = calculateLessonXp(passed);
   const summary = {
@@ -1093,7 +1156,7 @@ async function completeLesson() {
   if (passed) {
     state.progress.xp += xpEarned;
     state.progress.completedLessons.push(summary);
-    await handleFeedback("completion", { source: "lesson-pass" });
+    triggerFeedbackEffects("completion", { source: "lesson-pass" });
   } else {
     state.progress.xp += xpEarned;
     state.progress.failedAttempts.push(summary);
@@ -1274,11 +1337,11 @@ function grammarTipHtml(note) {
   if (!note) return "";
   const examples = (note.examples || []).slice(0, 2);
   return `
-    <details class="grammar-tip">
-      <summary>
+    <section class="grammar-tip" aria-label="Grammar tip">
+      <div class="grammar-tip-heading">
         <span>Grammar tip</span>
         <strong>${escapeHtml(note.title)}</strong>
-      </summary>
+      </div>
       <p>${escapeHtml(shortGrammarExplanation(note.explanation))}</p>
       ${examples.length ? `
         <div class="grammar-examples">
@@ -1287,7 +1350,7 @@ function grammarTipHtml(note) {
           `).join("")}
         </div>
       ` : ""}
-    </details>
+    </section>
   `;
 }
 
@@ -1563,11 +1626,29 @@ function waitForAudioUnlock() {
   });
 }
 
-async function handleFeedback(type, options = {}) {
-  recordFeedbackEvent(type, options);
+function triggerFeedbackEffects(type, options = {}) {
+  try {
+    recordFeedbackEvent(type, options);
+    queueMicrotask(() => {
+      runFeedbackEffects(type).catch((error) => {
+        feedbackDiagnostics.lastSoundStatus = "failed";
+        feedbackDiagnostics.lastError = error?.message || "feedback effect failed";
+        renderDeveloperPanel();
+      });
+    });
+  } catch (error) {
+    feedbackDiagnostics.lastSoundStatus = "failed";
+    feedbackDiagnostics.lastError = error?.message || "feedback trigger failed";
+    renderDeveloperPanel();
+  }
+}
+
+function handleFeedback(type, options = {}) {
+  triggerFeedbackEffects(type, options);
+}
+
+async function runFeedbackEffects(type) {
   feedbackDiagnostics.audioEnabled = !state.progress.soundMuted;
-  feedbackDiagnostics.lastType = type;
-  feedbackDiagnostics.lastAnswerCheckTriggeredFeedback = options.source === "answer-check";
 
   if (state.progress.soundMuted) {
     feedbackDiagnostics.lastSoundAt = timestampLabel();
@@ -1575,20 +1656,37 @@ async function handleFeedback(type, options = {}) {
     feedbackDiagnostics.lastHapticAt = timestampLabel();
     feedbackDiagnostics.lastHapticStatus = "skipped: audio off";
     renderDeveloperPanel();
-    return false;
+    return;
   }
 
-  const soundPlayed = await playFeedbackSound(type);
-  triggerFeedbackHaptic(type);
+  await playFeedbackSound(type);
+  try {
+    triggerFeedbackHaptic(type);
+  } catch (error) {
+    feedbackDiagnostics.lastHapticStatus = "failed";
+    feedbackDiagnostics.lastError = error?.message || "haptic failed";
+  }
   renderDeveloperPanel();
-  return soundPlayed;
 }
 
-function recordFeedbackEvent(type) {
+function recordFeedbackEvent(type, options = {}) {
+  const now = timestampLabel();
+  feedbackDiagnostics.lastType = type;
   feedbackDiagnostics.lastAttempt = type;
-  if (type === "correct") feedbackDiagnostics.correctSoundCalls += 1;
-  if (type === "wrong") feedbackDiagnostics.wrongSoundCalls += 1;
-  if (type === "completion") feedbackDiagnostics.completionSoundCalls += 1;
+  feedbackDiagnostics.lastAnswerCheckTriggeredFeedback = options.source === "answer-check";
+  if (type === "correct") {
+    feedbackDiagnostics.correctSoundCalls += 1;
+    feedbackDiagnostics.lastCorrectSoundAt = now;
+  }
+  if (type === "wrong") {
+    feedbackDiagnostics.wrongSoundCalls += 1;
+    feedbackDiagnostics.lastWrongSoundAt = now;
+  }
+  if (type === "completion") {
+    feedbackDiagnostics.completionSoundCalls += 1;
+    feedbackDiagnostics.lastCompletionSoundAt = now;
+  }
+  renderDeveloperPanel();
 }
 
 function recordAnswerCheckResult(correct) {
@@ -1597,15 +1695,15 @@ function recordAnswerCheckResult(correct) {
 }
 
 function playCorrectSound() {
-  return handleFeedback("correct", { source: "diagnostic" });
+  triggerFeedbackEffects("correct", { source: "diagnostic" });
 }
 
 function playWrongSound() {
-  return handleFeedback("wrong", { source: "diagnostic" });
+  triggerFeedbackEffects("wrong", { source: "diagnostic" });
 }
 
 function playCompletionSound() {
-  return handleFeedback("completion", { source: "diagnostic" });
+  triggerFeedbackEffects("completion", { source: "diagnostic" });
 }
 
 async function playFeedbackSound(type) {
@@ -1907,19 +2005,19 @@ function directionForItem(item, index) {
 }
 
 function taskPrompt(task) {
-  return task.direction === "en_to_nl" ? task.item.english : task.item.dutch;
+  return task.direction === "en_to_nl" ? getDisplayAnswer(task.item, "nl_to_en") : task.item.dutch;
 }
 
 function taskAnswer(task) {
-  return answerForDirection(task.item, task.direction);
+  return getDisplayAnswer(task.item, task.direction);
 }
 
 function answerForDirection(item, direction) {
-  return direction === "en_to_nl" ? displayDutch(item) : item.english;
+  return getDisplayAnswer(item, direction);
 }
 
 function choiceAnswerForDirection(item, direction) {
-  return direction === "en_to_nl" ? displayDutch(item) : getAcceptedAnswers(item)[0];
+  return getDisplayAnswer(item, direction);
 }
 
 function taskPromptLabel(task) {
@@ -1938,6 +2036,20 @@ function displayDutch(item) {
   return item.kind === "word" ? (item.displayDutch || item.dutch) : item.dutch;
 }
 
+function getDisplayAnswer(item, direction = "nl_to_en") {
+  if (direction === "en_to_nl") return displayDutch(item);
+  feedbackDiagnostics.lastTranslationDisplayItem = `${item.dutch || item.id || "unknown"} -> ${item.english || ""}`;
+  return item.english || "";
+}
+
+function isVocabularyItem(item) {
+  return item?.kind === "word" || item?.type === "vocabulary" || item?.type === "word";
+}
+
+function isSentenceItem(item) {
+  return item?.kind === "sentence" || item?.type === "sentence";
+}
+
 function isAnswerCorrect(answer, item, direction) {
   if (direction === "en_to_nl") {
     const acceptedDutch = [displayDutch(item), item.dutch, item.bareDutch].filter(Boolean);
@@ -1951,7 +2063,10 @@ function getAcceptedAnswers(item) {
   const values = [];
   if (Array.isArray(item.acceptedAnswers)) values.push(...item.acceptedAnswers);
   if (Array.isArray(item.aliases)) values.push(...item.aliases);
-  if (item.english) values.push(...String(item.english).split(/[;,]/));
+  if (item.english) {
+    if (isVocabularyItem(item)) values.push(...String(item.english).split(/[;,]/));
+    else values.push(String(item.english));
+  }
 
   return uniqueStrings(values.map((value) => {
     const cleaned = String(value)

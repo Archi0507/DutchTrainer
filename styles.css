@@ -849,22 +849,21 @@ h2 {
   padding: 12px;
 }
 
-.grammar-tip summary {
+.grammar-tip-heading {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 8px;
   align-items: center;
-  cursor: pointer;
 }
 
-.grammar-tip summary span {
+.grammar-tip-heading span {
   color: var(--primary-strong);
   font-size: 0.75rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.grammar-tip summary strong {
+.grammar-tip-heading strong {
   font-size: 0.95rem;
 }
 
