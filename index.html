@@ -28,30 +28,6 @@
       </header>
 
       <main>
-        <section class="stats-grid" aria-label="Learning stats">
-          <article class="stat-card">
-            <span id="xpValue">0</span>
-            <small>XP</small>
-          </article>
-          <article class="stat-card">
-            <span id="streakValue">0</span>
-            <small>Streak</small>
-          </article>
-          <article class="stat-card">
-            <span id="dueValue">0</span>
-            <small>Due</small>
-          </article>
-        </section>
-
-        <section class="hero-panel">
-          <div class="flag-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-          <div>
-            <p class="eyebrow">Vandaag</p>
-            <h2>Build your Dutch streak</h2>
-            <p class="hint">A friendly lesson path with quick reviews, vocabulary warm-ups, and sentence practice.</p>
-          </div>
-        </section>
-
         <section class="panel profile-panel">
           <div class="section-title">
             <h2>Profile</h2>
@@ -61,6 +37,20 @@
             <span>Learner name</span>
             <input id="learnerNameInput" autocomplete="name" placeholder="Your name">
           </label>
+          <div class="stats-grid" aria-label="Learning stats">
+            <article class="stat-card">
+              <span id="xpValue">0</span>
+              <small>XP</small>
+            </article>
+            <article class="stat-card">
+              <span id="streakValue">0</span>
+              <small>Streak</small>
+            </article>
+            <article class="stat-card">
+              <span id="dueValue">0</span>
+              <small>Due</small>
+            </article>
+          </div>
           <div class="profile-grid">
             <article>
               <strong id="profileStreak">0</strong>
@@ -81,9 +71,26 @@
           </div>
         </section>
 
+        <section class="panel practice-panel">
+          <div class="section-title">
+            <h2 id="practiceTitle">Practice</h2>
+            <span id="practiceMeta">Choose a topic</span>
+          </div>
+
+          <div id="exerciseArea" class="exercise-area"></div>
+        </section>
+
+        <section class="panel vocab-panel">
+          <div class="section-title">
+            <h2>Vocabulary</h2>
+            <span id="vocabCount">Words</span>
+          </div>
+          <div id="vocabPractice" class="vocab-practice"></div>
+        </section>
+
         <section class="panel">
           <div class="section-title">
-            <h2>Topic</h2>
+            <h2>Topics</h2>
             <span id="topicCount">Loading</span>
           </div>
           <div id="topicList" class="topic-list"></div>
@@ -96,26 +103,9 @@
           </div>
           <div id="lessonPath" class="lesson-path"></div>
         </section>
-
-        <section class="panel vocab-panel">
-          <div class="section-title">
-            <h2>Vocabulary</h2>
-            <span id="vocabCount">Words</span>
-          </div>
-          <div id="vocabPractice" class="vocab-practice"></div>
-        </section>
-
-        <section class="panel practice-panel">
-          <div class="section-title">
-            <h2 id="practiceTitle">Practice</h2>
-            <span id="practiceMeta">Choose a topic</span>
-          </div>
-
-          <div id="exerciseArea" class="exercise-area"></div>
-        </section>
       </main>
     </div>
 
-    <script src="app.js?v=15" type="module"></script>
+    <script src="app.js?v=16" type="module"></script>
   </body>
 </html>

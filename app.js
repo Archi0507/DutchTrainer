@@ -48,6 +48,8 @@ const els = {
 };
 
 let audioContext;
+let audioUnlocked = false;
+let audioUnlocking = false;
 let devPanel;
 
 init();
@@ -114,6 +116,9 @@ function bindEvents() {
   };
 
   window.addEventListener("pagehide", saveProgress);
+  ["pointerdown", "touchstart", "keydown"].forEach((eventName) => {
+    document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
+  });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveProgress();
   });
@@ -126,6 +131,7 @@ function bindEvents() {
 
   els.soundToggle.addEventListener("click", () => {
     state.progress.soundMuted = !state.progress.soundMuted;
+    if (!state.progress.soundMuted) unlockAudio();
     saveProgress();
     renderSoundButton();
   });
@@ -210,6 +216,7 @@ function renderProfile() {
 function renderSoundButton() {
   els.soundToggle.textContent = state.progress.soundMuted ? "🔇" : "♪";
   els.soundToggle.setAttribute("aria-label", state.progress.soundMuted ? "Unmute sounds" : "Mute sounds");
+  els.soundToggle.setAttribute("aria-pressed", String(!state.progress.soundMuted));
 }
 
 function renderTopics() {
@@ -760,11 +767,11 @@ function tryMatch(task) {
   if (correct) {
     task.matchedIds.push(item.id);
     state.feedback = "Correct!";
-    playSound("correct");
+    playCorrectSound();
   } else if (item) {
     task.hadMistake = true;
     state.feedback = `Answer: ${item.dutch} = ${item.english}`;
-    playSound("wrong");
+    playWrongSound();
   }
 
   state.selectedDutchId = "";
@@ -795,7 +802,10 @@ function finishTask(task, correct, items, options = {}) {
     }
   });
 
-  if (!options.soundAlreadyPlayed) playSound(correct ? "correct" : "wrong");
+  if (!options.soundAlreadyPlayed) {
+    if (correct) playCorrectSound();
+    else playWrongSound();
+  }
   saveProgress();
   renderStats();
 }
@@ -841,11 +851,11 @@ function completeLesson() {
   if (passed) {
     state.progress.xp += xpEarned;
     state.progress.completedLessons.push(summary);
-    playSound("complete");
+    playCompletionSound();
   } else {
     state.progress.xp += xpEarned;
     state.progress.failedAttempts.push(summary);
-    playSound("wrong");
+    playWrongSound();
   }
 
   state.lesson.xpEarned = xpEarned;
@@ -1012,14 +1022,56 @@ function updateStreak() {
   state.progress.lastPracticeDay = today;
 }
 
-function playSound(kind) {
+function unlockAudio() {
   if (state.progress.soundMuted) return;
+  if (audioUnlocked) return true;
+  if (audioContext?.state === "running") {
+    audioUnlocked = true;
+    return true;
+  }
+  if (audioUnlocking) return false;
 
   const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  if (!AudioContext) return false;
 
   audioContext ||= new AudioContext();
-  if (audioContext.state === "suspended") audioContext.resume();
+
+  if (audioContext.state === "running") {
+    audioUnlocked = true;
+    return true;
+  }
+
+  audioUnlocking = true;
+  audioContext.resume()
+    .then(() => {
+      audioUnlocked = audioContext.state === "running";
+    })
+    .catch(() => {
+      audioUnlocked = false;
+    })
+    .finally(() => {
+      audioUnlocking = false;
+    });
+
+  return audioContext.state === "running";
+}
+
+function playCorrectSound() {
+  playSound("correct");
+}
+
+function playWrongSound() {
+  playSound("wrong");
+}
+
+function playCompletionSound() {
+  playSound("complete");
+}
+
+function playSound(kind) {
+  if (state.progress.soundMuted) return;
+  if (audioContext?.state === "running") audioUnlocked = true;
+  if (!audioUnlocked && !unlockAudio()) return;
 
   const patterns = {
     correct: [{ frequency: 660, start: 0, duration: 0.08 }, { frequency: 880, start: 0.08, duration: 0.1 }],
@@ -1027,7 +1079,10 @@ function playSound(kind) {
     complete: [{ frequency: 523, start: 0, duration: 0.1 }, { frequency: 659, start: 0.1, duration: 0.1 }, { frequency: 784, start: 0.2, duration: 0.16 }]
   };
 
-  patterns[kind].forEach((tone) => {
+  const pattern = patterns[kind];
+  if (!pattern || !audioContext) return;
+
+  pattern.forEach((tone) => {
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
     const startsAt = audioContext.currentTime + tone.start;
