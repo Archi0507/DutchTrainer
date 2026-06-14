@@ -11,11 +11,14 @@ const STREAK_BONUS_XP = 15;
 const CONTENT_MODE = new URLSearchParams(window.location.search).get("content") === "preview" ? "preview" : "live";
 const DATA_ROOT = CONTENT_MODE === "preview" ? "data-preview" : "data";
 const PROGRESS_KEY = CONTENT_MODE === "preview" ? "dutchTrainerProgressPreview" : "dutchTrainerProgress";
+const VERSION_LABEL = "🇳🇱 v2.0";
+const LEVEL_SEQUENCE = ["A0", "A1.1", "A1.2", "A2.1", "A2.2", "B1.1", "B1.2"];
 
 const state = {
   words: [],
   sentences: [],
   lessonPlan: [],
+  grammarNotes: [],
   topic: "",
   lesson: null,
   feedback: "",
@@ -50,6 +53,14 @@ const els = {
 let audioContext;
 let audioUnlocked = false;
 let audioUnlocking = false;
+let speechUnlocked = false;
+let dutchVoice = null;
+let voicesReady = false;
+const speechDiagnostics = {
+  available: "speechSynthesis" in window,
+  lastAttempt: "none",
+  lastError: "none"
+};
 let devPanel;
 
 init();
@@ -59,15 +70,18 @@ async function init() {
   applySavedTheme();
   bindEvents();
 
-  const [words, sentences, lessonPlan] = await Promise.all([
+  const [words, sentences, lessonPlan, grammarNotes] = await Promise.all([
     fetchJson(`${DATA_ROOT}/vocabulary.json`),
     fetchJson(`${DATA_ROOT}/sentences.json`),
-    fetchOptionalJson(`${DATA_ROOT}/lesson-plan.json`)
+    fetchOptionalJson(`${DATA_ROOT}/lesson-plan.json`),
+    fetchOptionalJson("data/grammar-notes.json")
   ]);
 
   state.words = words;
   state.sentences = sentences;
   state.lessonPlan = lessonPlan?.lessons || [];
+  state.grammarNotes = grammarNotes || [];
+  loadDutchVoices();
   ensureVocabularySrsRecords();
   state.topic = topics()[0] || "";
   setupDeveloperTools();
@@ -108,6 +122,7 @@ function bindEvents() {
       startLesson({ vocabularyOnly: true });
       render();
     },
+    speakDutch: (text) => pronounceDutch(text, { source: "tap" }),
     continueLesson,
     checkTyped: () => {
       const input = document.querySelector("#answerInput");
@@ -118,6 +133,7 @@ function bindEvents() {
   window.addEventListener("pagehide", saveProgress);
   ["pointerdown", "touchstart", "keydown"].forEach((eventName) => {
     document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
+    document.addEventListener(eventName, unlockSpeech, { once: true, passive: true });
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveProgress();
@@ -131,9 +147,13 @@ function bindEvents() {
 
   els.soundToggle.addEventListener("click", () => {
     state.progress.soundMuted = !state.progress.soundMuted;
-    if (!state.progress.soundMuted) unlockAudio();
+    if (!state.progress.soundMuted) {
+      unlockAudio();
+      unlockSpeech();
+    }
     saveProgress();
     renderSoundButton();
+    renderDeveloperPanel();
   });
 
   els.learnerName.addEventListener("input", () => {
@@ -145,6 +165,12 @@ function bindEvents() {
     const button = event.target.closest("button");
     if (!button) return;
     if (button.hasAttribute("onclick")) return;
+
+    const speakButton = event.target.closest("[data-speak-dutch]");
+    if (speakButton) {
+      pronounceDutch(speakButton.dataset.speakDutch, { source: "tap" });
+      return;
+    }
 
     if (button.dataset.action === "start-lesson") {
       startLesson();
@@ -193,8 +219,8 @@ function render() {
 function renderContentMode() {
   if (!els.contentModeBadge) return;
   els.contentModeBadge.textContent = CONTENT_MODE === "preview"
-    ? "Preview content • separate progress"
-    : "Live content";
+    ? `${VERSION_LABEL} preview`
+    : VERSION_LABEL;
 }
 
 function renderStats() {
@@ -214,8 +240,8 @@ function renderProfile() {
 }
 
 function renderSoundButton() {
-  els.soundToggle.textContent = state.progress.soundMuted ? "🔇" : "♪";
-  els.soundToggle.setAttribute("aria-label", state.progress.soundMuted ? "Unmute sounds" : "Mute sounds");
+  els.soundToggle.textContent = state.progress.soundMuted ? "🔇 Audio Off" : "🔊 Audio On";
+  els.soundToggle.setAttribute("aria-label", state.progress.soundMuted ? "Turn audio on" : "Turn audio off");
   els.soundToggle.setAttribute("aria-pressed", String(!state.progress.soundMuted));
 }
 
@@ -292,7 +318,11 @@ function renderVocabularyPractice() {
       <button class="secondary-button" type="button" data-vocab-action="weak">Weak words</button>
     </div>
     <div class="word-strip" aria-label="Vocabulary preview">
-      ${previewWords.map((word) => `<span class="word-chip">${escapeHtml(word.dutch)}</span>`).join("")}
+      ${previewWords.map((word) => `
+        <button class="word-chip speak-chip" type="button" data-speak-dutch="${escapeHtml(pronunciationText(word))}">
+          ${escapeHtml(displayDutch(word))}
+        </button>
+      `).join("")}
     </div>
   `;
 
@@ -301,6 +331,10 @@ function renderVocabularyPractice() {
       startLesson({ vocabularyOnly: true, mistakesOnly: button.dataset.vocabAction === "weak" });
       render();
     });
+  });
+
+  els.vocabPractice.querySelectorAll("[data-speak-dutch]").forEach((button) => {
+    button.addEventListener("click", () => pronounceDutch(button.dataset.speakDutch, { source: "vocabulary tap" }));
   });
 }
 
@@ -343,6 +377,21 @@ function renderDeveloperPanel() {
       <button type="button" data-dev-action="due">Mark 10 items due</button>
       <button type="button" data-dev-action="pass">Simulate passing a lesson</button>
       <button type="button" data-dev-action="fail">Simulate failing a lesson</button>
+      <button type="button" data-dev-action="test-word">Test Dutch Word</button>
+      <button type="button" data-dev-action="test-sentence">Test Dutch Sentence</button>
+    </div>
+    <div class="audio-diagnostics">
+      <h3>Audio Diagnostics</h3>
+      <dl>
+        <div><dt>Speech synthesis available</dt><dd>${speechDiagnostics.available ? "yes" : "no"}</dd></div>
+        <div><dt>Selected Dutch voice</dt><dd>${escapeHtml(selectedVoiceLabel())}</dd></div>
+        <div><dt>Audio enabled</dt><dd>${state.progress.soundMuted ? "no" : "yes"}</dd></div>
+        <div><dt>Audio unlocked</dt><dd>${audioUnlocked ? "yes" : "no"}</dd></div>
+        <div><dt>Speech unlocked</dt><dd>${speechUnlocked ? "yes" : "no"}</dd></div>
+        <div><dt>Speech synthesis state</dt><dd>${escapeHtml(speechStateLabel())}</dd></div>
+        <div><dt>Last pronunciation attempted</dt><dd>${escapeHtml(speechDiagnostics.lastAttempt)}</dd></div>
+        <div><dt>Last speech error</dt><dd>${escapeHtml(speechDiagnostics.lastError)}</dd></div>
+      </dl>
     </div>
     <div class="srs-debug">
       <table>
@@ -386,6 +435,8 @@ function renderDeveloperPanel() {
       if (action === "due") markItemsDue();
       if (action === "pass") simulatePassingLesson();
       if (action === "fail") simulateFailingLesson();
+      if (action === "test-word") pronounceDutch("de tafel", { source: "diagnostic word" });
+      if (action === "test-sentence") pronounceDutch("Ik leer Nederlands.", { source: "diagnostic sentence" });
       render();
     });
   });
@@ -518,6 +569,7 @@ function renderLessonStart() {
       <p class="prompt-label">Today</p>
       <h3>Keep your Dutch moving</h3>
       <p class="hint">Reviews come first, then new words, then extra practice for weak words. ${CONTENT_MODE === "preview" ? "Preview mode uses the staged v3 pack and Duome vocabulary." : ""}</p>
+      ${grammarTipHtml(grammarTipForPlan(plan))}
       <div class="today-rings">
         <div>
           <strong>${plan.newWords.length}</strong>
@@ -557,7 +609,7 @@ function renderMultipleChoice(task) {
 
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
-    ${promptHtml(taskPrompt(task), taskPromptLabel(task))}
+    ${promptHtml(taskPrompt(task), taskPromptLabel(task), taskPromptSpeechText(task))}
     <div class="choice-grid">
       ${choices.map((choice) => `<button class="choice-button" type="button" data-answer="${escapeHtml(choice)}">${escapeHtml(choice)}</button>`).join("")}
     </div>
@@ -573,7 +625,7 @@ function renderTyped(task) {
   const targetLanguage = task.direction === "en_to_nl" ? "Dutch" : "English";
   els.exerciseArea.innerHTML = `
     ${lessonProgressHtml()}
-    ${promptHtml(taskPrompt(task), `Type the ${targetLanguage} translation`)}
+    ${promptHtml(taskPrompt(task), `Type the ${targetLanguage} translation`, taskPromptSpeechText(task))}
     <input id="answerInput" class="answer-input" autocomplete="off" autocapitalize="none" placeholder="${targetLanguage} translation">
     <button id="checkTyped" class="primary-button" type="button" data-action="check-typed" onclick="window.dutchTrainerActions.checkTyped()">Check</button>
     ${feedbackHtml()}
@@ -592,7 +644,7 @@ function renderMatching(task) {
     <p class="hint">Match each Dutch word to English. One mistake makes this exercise incorrect, but you can still finish the set.</p>
     <div class="match-columns">
       <div class="match-grid">
-        ${task.items.map((item) => matchButton(item.dutch, "dutch", item.id, state.selectedDutchId === item.id, task.matchedIds.includes(item.id))).join("")}
+        ${task.items.map((item) => matchButton(displayDutch(item), "dutch", item.id, state.selectedDutchId === item.id, task.matchedIds.includes(item.id), pronunciationText(item))).join("")}
       </div>
       <div class="match-grid">
         ${task.englishChoices.map((english) => {
@@ -608,7 +660,9 @@ function renderMatching(task) {
   els.exerciseArea.querySelectorAll(".match-button").forEach((button) => {
     button.addEventListener("click", () => {
       if (task.answered) return;
-      if (button.dataset.side === "dutch") state.selectedDutchId = button.dataset.value;
+      if (button.dataset.side === "dutch") {
+        state.selectedDutchId = button.dataset.value;
+      }
       if (button.dataset.side === "english") state.selectedEnglish = button.dataset.value;
       tryMatch(task);
       render();
@@ -651,12 +705,13 @@ function renderLessonResult() {
 function startLesson(options = {}) {
   const plan = buildLessonPlan(options);
   const newWords = plan.newWords;
-  const lessonItems = buildLessonItems(plan);
+  const lessonItems = buildLessonItems(plan, options);
   const tasks = buildTasks(lessonItems);
 
   state.lesson = {
     id: `lesson-${Date.now()}`,
     topic: state.topic,
+    level: lessonLevelForTopic(state.topic),
     startedAt: new Date().toISOString(),
     newWordIds: newWords.map((word) => word.id),
     reviewIds: plan.reviews.map((item) => item.id),
@@ -686,7 +741,8 @@ function buildLessonPlan(options = {}) {
   return {
     reviews,
     newWords,
-    weak
+    weak,
+    options
   };
 }
 
@@ -699,21 +755,48 @@ function pickNewWords(excludeIds = new Set(), options = {}) {
   return uniqueById([...preferred, ...unseen]).slice(0, NEW_WORD_TARGET);
 }
 
-function buildLessonItems(plan) {
-  const planIds = new Set([...plan.reviews, ...plan.newWords, ...plan.weak].map((item) => item.id));
-  const fallback = shuffle(allPracticeItems()).filter((item) => !planIds.has(item.id));
-  return uniqueById([...plan.reviews, ...plan.newWords, ...plan.weak, ...fallback]).slice(0, LESSON_SIZE);
+function buildLessonItems(plan, options = {}) {
+  if (options.vocabularyOnly) {
+    const planIds = new Set([...plan.reviews, ...plan.newWords, ...plan.weak].map((item) => item.id));
+    const fallbackWords = shuffle(state.words.map((item) => ({ ...item, kind: "word" }))).filter((item) => !planIds.has(item.id));
+    return uniqueById([...plan.reviews, ...plan.newWords, ...plan.weak, ...fallbackWords]).slice(0, LESSON_SIZE);
+  }
+
+  const level = lessonLevelForTopic(state.topic);
+  const sentenceTarget = sentenceTargetForLevel(level);
+  const wordTarget = LESSON_SIZE - sentenceTarget;
+  const sentencePool = uniqueById([
+    ...plan.reviews.filter((item) => item.kind === "sentence"),
+    ...plan.weak.filter((item) => item.kind === "sentence"),
+    ...sentencesForTopic(state.topic),
+    ...state.sentences.map((item) => ({ ...item, kind: "sentence" }))
+  ]);
+  const wordPool = uniqueById([
+    ...plan.reviews.filter((item) => item.kind === "word"),
+    ...plan.newWords,
+    ...plan.weak.filter((item) => item.kind === "word"),
+    ...wordsForTopic(state.topic),
+    ...state.words.map((item) => ({ ...item, kind: "word" }))
+  ]);
+  const selectedSentences = sentencePool.slice(0, sentenceTarget);
+  const selectedWords = wordPool.slice(0, wordTarget);
+  const fallback = shuffle(allPracticeItems()).filter((item) => {
+    const used = new Set([...selectedSentences, ...selectedWords].map((usedItem) => usedItem.id));
+    return !used.has(item.id);
+  });
+
+  return uniqueById([...selectedSentences, ...selectedWords, ...fallback]).slice(0, LESSON_SIZE);
 }
 
 function buildTasks(items) {
   const enoughWords = state.words.length >= 3;
   return Array.from({ length: LESSON_SIZE }, (_, index) => {
     const item = items[index % items.length];
-    const type = index % 3 === 0
-      ? "multiple"
+    const type = item.kind === "word" && index % 3 === 2
+      ? "matching"
       : index % 3 === 1
         ? "typed"
-        : "matching";
+        : "multiple";
 
     if (type === "matching" && enoughWords) {
       const matchItems = matchingItemsFor(item);
@@ -751,9 +834,13 @@ function answerTask(task, answer) {
   if (task.answered) return;
 
   const expected = taskAnswer(task);
-  const correct = normalize(answer) === normalize(expected);
+  const correct = isAcceptedAnswer(task, answer, expected);
   task.answered = true;
   state.feedback = correct ? "Correct!" : `Answer: ${expected}`;
+  if (task.direction === "en_to_nl" && correct) {
+    pronounceDutch(answer, { source: "selected answer" });
+  }
+  if (!correct) pronounceDutchAnswer(task, expected);
   finishTask(task, correct, [task.item]);
   render();
 }
@@ -770,7 +857,8 @@ function tryMatch(task) {
     playCorrectSound();
   } else if (item) {
     task.hadMistake = true;
-    state.feedback = `Answer: ${item.dutch} = ${item.english}`;
+    state.feedback = `Answer: ${displayDutch(item)} = ${item.english}`;
+    pronounceDutch(pronunciationText(item), { source: "answer reveal" });
     playWrongSound();
   }
 
@@ -888,12 +976,13 @@ function lessonProgressHtml() {
   `;
 }
 
-function promptHtml(text, label) {
+function promptHtml(text, label, speakText = "") {
   return `
-    <div class="prompt-card">
+    <button class="prompt-card ${speakText ? "speakable" : ""}" type="button" ${speakText ? `data-speak-dutch="${escapeHtml(speakText)}"` : ""}>
       <span class="prompt-label">${escapeHtml(label)}</span>
       <strong class="prompt-text">${escapeHtml(text)}</strong>
-    </div>
+      ${speakText ? '<span class="pronounce-hint">Tap to hear Dutch</span>' : ""}
+    </button>
   `;
 }
 
@@ -906,13 +995,14 @@ function feedbackHtml(showNext = true) {
   `;
 }
 
-function matchButton(label, side, value, selected, done) {
+function matchButton(label, side, value, selected, done, speakText = "") {
   return `
     <button
       class="match-button ${selected ? "selected" : ""} ${done ? "done" : ""}"
       type="button"
       data-side="${side}"
       data-value="${escapeHtml(value)}"
+      ${speakText ? `data-speak-dutch="${escapeHtml(speakText)}"` : ""}
       ${done ? "disabled" : ""}
     >${escapeHtml(label)}</button>
   `;
@@ -923,7 +1013,7 @@ function reviewListHtml(items) {
     <div class="review-list">
       <h4>Suggested review</h4>
       ${items.slice(0, 8).map((item) => `
-        <p><strong>${escapeHtml(item.dutch)}</strong><span>${escapeHtml(item.english)}</span></p>
+        <p><button class="text-speak-button" type="button" data-speak-dutch="${escapeHtml(pronunciationText(item))}">${escapeHtml(displayDutch(item))}</button><span>${escapeHtml(item.english)}</span></p>
       `).join("")}
     </div>
   `;
@@ -945,6 +1035,62 @@ function nextReviewEstimate() {
   if (days === 0) return "today";
   if (days === 1) return "tomorrow";
   return `${days} days`;
+}
+
+function grammarTipForPlan(plan) {
+  const level = lessonLevelForTopic(state.topic);
+  return state.grammarNotes.find((note) => {
+    const groups = note.linkedLessonGroups || [];
+    const topics = note.linkedTopics || [];
+    return note.level === level && (
+      topics.includes(state.topic) ||
+      groups.some((groupId) => [plan.reviews, plan.newWords, plan.weak].flat().some((item) => item.lessonGroupId === groupId))
+    );
+  }) || state.grammarNotes.find((note) => note.level === level) || null;
+}
+
+function grammarTipHtml(note) {
+  if (!note) return "";
+  const examples = (note.examples || []).slice(0, 2);
+  return `
+    <aside class="grammar-tip">
+      <p class="prompt-label">💡 Grammar Tip</p>
+      <h4>${escapeHtml(note.title)}</h4>
+      <p>${escapeHtml(note.explanation)}</p>
+      ${examples.length ? `
+        <div class="grammar-examples">
+          ${examples.map((example) => `
+            <button class="text-speak-button" type="button" data-speak-dutch="${escapeHtml(example.dutch)}">${escapeHtml(example.dutch)}</button>
+          `).join("")}
+        </div>
+      ` : ""}
+    </aside>
+  `;
+}
+
+function sentenceTargetForLevel(level) {
+  if (level === "B1") return 16;
+  if (level === "A2") return 14;
+  return 12;
+}
+
+function lessonLevelForTopic(topic) {
+  const lesson = state.lessonPlan.find((candidate) => candidate.topic === topic || candidate.lessonGroupName === topic);
+  if (lesson?.cefrLevel) return lesson.cefrLevel;
+  const item = allPracticeItems().find((candidate) => candidate.topic === topic && candidate.cefrLevel);
+  return item?.cefrLevel || "A1";
+}
+
+function wordsForTopic(topic) {
+  return state.words
+    .filter((item) => item.topic === topic || item.lessonGroupName === topic)
+    .map((item) => ({ ...item, kind: "word" }));
+}
+
+function sentencesForTopic(topic) {
+  return state.sentences
+    .filter((item) => item.topic === topic || item.lessonGroupName === topic)
+    .map((item) => ({ ...item, kind: "sentence" }));
 }
 
 function answerChoices(task) {
@@ -1020,6 +1166,98 @@ function updateStreak() {
     ? state.progress.streak + 1
     : 1;
   state.progress.lastPracticeDay = today;
+}
+
+function loadDutchVoices() {
+  if (!speechDiagnostics.available) return;
+  const setVoice = () => {
+    const voices = window.speechSynthesis.getVoices();
+    voicesReady = voices.length > 0;
+    dutchVoice = chooseDutchVoice(voices);
+  };
+
+  setVoice();
+  window.speechSynthesis.onvoiceschanged = () => {
+    setVoice();
+    renderDeveloperPanel();
+  };
+}
+
+function chooseDutchVoice(voices) {
+  return voices.find((voice) => voice.lang === "nl-NL" && voice.localService)
+    || voices.find((voice) => voice.lang === "nl-NL")
+    || voices.find((voice) => voice.lang?.toLowerCase().startsWith("nl"))
+    || voices.find((voice) => /dutch|nederlands/i.test(`${voice.name} ${voice.lang}`))
+    || null;
+}
+
+function unlockSpeech() {
+  if (state.progress.soundMuted) return false;
+  if (!speechDiagnostics.available) {
+    speechDiagnostics.lastError = "speechSynthesis unavailable";
+    return false;
+  }
+  loadDutchVoices();
+  speechUnlocked = true;
+  return true;
+}
+
+function pronounceDutch(text, options = {}) {
+  const phrase = String(text || "").trim();
+  if (!phrase || state.progress.soundMuted) return;
+
+  speechDiagnostics.lastAttempt = phrase;
+
+  if (!speechDiagnostics.available) {
+    speechDiagnostics.lastError = "speechSynthesis unavailable";
+    renderDeveloperPanel();
+    return;
+  }
+
+  if (!speechUnlocked && !unlockSpeech()) {
+    speechDiagnostics.lastError = "speech not unlocked yet";
+    renderDeveloperPanel();
+    return;
+  }
+
+  loadDutchVoices();
+  if (!dutchVoice) {
+    speechDiagnostics.lastError = "No Dutch voice found. Install or enable an nl-NL voice in the browser/OS.";
+    renderDeveloperPanel();
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(phrase);
+  utterance.lang = "nl-NL";
+  utterance.voice = dutchVoice;
+  utterance.rate = options.rate || 0.92;
+  utterance.pitch = 1;
+  utterance.onstart = () => {
+    speechDiagnostics.lastError = "none";
+    renderDeveloperPanel();
+  };
+  utterance.onerror = (event) => {
+    speechDiagnostics.lastError = event.error || "unknown speech error";
+    renderDeveloperPanel();
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+function selectedVoiceLabel() {
+  if (!speechDiagnostics.available) return "speechSynthesis unavailable";
+  if (!voicesReady) return "voices loading";
+  if (!dutchVoice) return "no Dutch voice selected";
+  return `${dutchVoice.name} (${dutchVoice.lang})`;
+}
+
+function speechStateLabel() {
+  if (!speechDiagnostics.available) return "unavailable";
+  if (window.speechSynthesis.speaking) return "speaking";
+  if (window.speechSynthesis.pending) return "pending";
+  if (window.speechSynthesis.paused) return "paused";
+  return "idle";
 }
 
 function unlockAudio() {
@@ -1220,11 +1458,37 @@ function taskAnswer(task) {
 }
 
 function answerForDirection(item, direction) {
-  return direction === "en_to_nl" ? item.dutch : item.english;
+  return direction === "en_to_nl" ? displayDutch(item) : item.english;
 }
 
 function taskPromptLabel(task) {
   return task.direction === "en_to_nl" ? "Translate to Dutch" : "Translate to English";
+}
+
+function taskPromptSpeechText(task) {
+  return task.direction === "nl_to_en" ? pronunciationText(task.item) : "";
+}
+
+function pronunciationText(item) {
+  return item.kind === "word" ? (item.displayDutch || item.dutch) : item.dutch;
+}
+
+function displayDutch(item) {
+  return item.kind === "word" ? (item.displayDutch || item.dutch) : item.dutch;
+}
+
+function isAcceptedAnswer(task, answer, expected) {
+  if (normalize(answer) === normalize(expected)) return true;
+  if (task.direction === "en_to_nl" && task.item.kind === "word" && task.item.bareDutch) {
+    return normalize(answer) === normalize(task.item.bareDutch);
+  }
+  return false;
+}
+
+function pronounceDutchAnswer(task, expected) {
+  if (task.direction === "en_to_nl") {
+    pronounceDutch(expected, { source: "answer reveal" });
+  }
 }
 
 function loadProgress() {

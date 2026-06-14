@@ -1,4 +1,4 @@
-const CACHE_NAME = "dutchtrainer-v16";
+const CACHE_NAME = "dutchtrainer-v20";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,8 @@ const APP_SHELL = [
   "./data/vocabulary.json",
   "./data/sentences.json",
   "./data/lesson-plan.json",
+  "./data/grammar-notes.json",
+  "./data/level-structure.json",
   "./data-preview/vocabulary.json",
   "./data-preview/sentences.json",
   "./data-preview/lesson-plan.json",
